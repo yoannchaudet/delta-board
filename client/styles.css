@@ -51,6 +51,7 @@ header h1 {
     height: 10px;
     border-radius: 50%;
     background-color: var(--color-border);
+    cursor: help;
 }
 
 .status-indicator.connected {

@@ -170,8 +170,10 @@ function applyOperation(op) {
     }
 }
 
-// WebSocket (Phase 5 - ready for future use)
+// WebSocket
 let ws = null;
+let reconnectAttempts = 0;
+const maxReconnectAttempts = 10;
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -181,17 +183,29 @@ function connectWebSocket() {
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-            updateConnectionStatus('connected');
+            reconnectAttempts = 0;
+            updateConnectionStatus('connected', 'Connected - changes sync in real-time');
         };
 
-        ws.onclose = () => {
-            updateConnectionStatus('disconnected');
-            // Reconnect after 3 seconds
-            setTimeout(connectWebSocket, 3000);
+        ws.onclose = (event) => {
+            ws = null;
+            if (event.code === 4000) {
+                updateConnectionStatus('disconnected', 'Board is full (max 20 participants)');
+                return;
+            }
+
+            if (reconnectAttempts < maxReconnectAttempts) {
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                reconnectAttempts++;
+                updateConnectionStatus('disconnected', `Disconnected - reconnecting in ${Math.round(delay / 1000)}s...`);
+                setTimeout(connectWebSocket, delay);
+            } else {
+                updateConnectionStatus('disconnected', 'Disconnected - refresh to reconnect');
+            }
         };
 
         ws.onerror = () => {
-            updateConnectionStatus('disconnected');
+            // Error will trigger onclose, no need to handle separately
         };
 
         ws.onmessage = (event) => {
@@ -204,6 +218,7 @@ function connectWebSocket() {
         };
     } catch (e) {
         console.log('WebSocket not available, running in local-only mode');
+        updateConnectionStatus('disconnected', 'Local mode - no real-time sync');
     }
 }
 
@@ -213,9 +228,10 @@ function broadcastOperation(op) {
     }
 }
 
-function updateConnectionStatus(status) {
+function updateConnectionStatus(status, message = '') {
     const indicator = document.getElementById('connection-status');
     indicator.className = `status-indicator ${status}`;
+    indicator.title = message;
 }
 
 // Rendering
@@ -352,9 +368,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial render
     renderCards();
 
-    // Connect WebSocket (will fail gracefully if server not running)
-    // Uncomment when server is available:
-    // connectWebSocket();
+    // Connect WebSocket
+    connectWebSocket();
 });
 
 // Handle URL changes
