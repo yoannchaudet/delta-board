@@ -25,7 +25,7 @@ This approach eliminates most concurrency issues and enables clean conflict reso
 
 - **Server**: C# / .NET (WebSocket support)
 - **Client**: HTML5, CSS3, Vanilla JavaScript (ES6+)
-- **Communication**: WebSocket protocol
+- **Communication**: WebSocket protocol (see [PROTOCOL.md](PROTOCOL.md) for details)
 - **Storage**: Browser localStorage API
 
 ## URL Format

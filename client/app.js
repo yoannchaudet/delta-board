@@ -123,6 +123,17 @@ function toggleVote(cardId) {
 // Apply remote operations
 function applyOperation(op) {
     switch (op.type) {
+        case 'requestSync':
+            // Another client is requesting sync, send them our state
+            sendSyncState(op._connectionId);
+            break;
+
+        case 'syncState':
+            // Received state from another client, merge it
+            // We process ALL syncState messages for resilience against partitioned clients
+            mergeState(op.state);
+            break;
+
         case 'createCard':
             if (!state.cards.find(c => c.id === op.card.id)) {
                 state.cards.push(op.card);
@@ -130,14 +141,16 @@ function applyOperation(op) {
                 renderCards();
             }
             break;
+
         case 'editCard':
-            const editCard = state.cards.find(c => c.id === op.cardId);
-            if (editCard) {
-                editCard.text = op.text;
+            const cardToEdit = state.cards.find(c => c.id === op.cardId);
+            if (cardToEdit) {
+                cardToEdit.text = op.text;
                 saveState();
                 renderCards();
             }
             break;
+
         case 'deleteCard':
             const delIndex = state.cards.findIndex(c => c.id === op.cardId);
             if (delIndex !== -1) {
@@ -147,6 +160,7 @@ function applyOperation(op) {
                 renderCards();
             }
             break;
+
         case 'addVote':
             if (!state.votes[op.cardId]) {
                 state.votes[op.cardId] = [];
@@ -157,6 +171,7 @@ function applyOperation(op) {
                 renderCards();
             }
             break;
+
         case 'removeVote':
             if (state.votes[op.cardId]) {
                 const voteIndex = state.votes[op.cardId].indexOf(op.voterId);
@@ -168,6 +183,49 @@ function applyOperation(op) {
             }
             break;
     }
+}
+
+function sendSyncState(targetConnectionId) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: 'syncState',
+            _targetConnectionId: targetConnectionId,
+            state: {
+                cards: state.cards,
+                votes: state.votes
+            }
+        }));
+    }
+}
+
+function mergeState(remoteState) {
+    if (!remoteState) return;
+
+    // Merge cards (add any we don't have)
+    if (remoteState.cards) {
+        for (const card of remoteState.cards) {
+            if (!state.cards.find(c => c.id === card.id)) {
+                state.cards.push(card);
+            }
+        }
+    }
+
+    // Merge votes (union of voter IDs)
+    if (remoteState.votes) {
+        for (const [cardId, voters] of Object.entries(remoteState.votes)) {
+            if (!state.votes[cardId]) {
+                state.votes[cardId] = [];
+            }
+            for (const voter of voters) {
+                if (!state.votes[cardId].includes(voter)) {
+                    state.votes[cardId].push(voter);
+                }
+            }
+        }
+    }
+
+    saveState();
+    renderCards();
 }
 
 // WebSocket
@@ -185,6 +243,8 @@ function connectWebSocket() {
         ws.onopen = () => {
             reconnectAttempts = 0;
             updateConnectionStatus('connected', 'Connected - changes sync in real-time');
+            // Request state from other participants
+            ws.send(JSON.stringify({ type: 'requestSync' }));
         };
 
         ws.onclose = (event) => {
