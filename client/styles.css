@@ -1,0 +1,232 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --color-bg: #f5f5f5;
+    --color-white: #ffffff;
+    --color-text: #333333;
+    --color-text-light: #666666;
+    --color-border: #e0e0e0;
+    --color-well: #4caf50;
+    --color-well-bg: #e8f5e9;
+    --color-delta: #2196f3;
+    --color-delta-bg: #e3f2fd;
+    --color-vote: #ff9800;
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --radius: 8px;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100vh;
+}
+
+header {
+    background-color: var(--color-white);
+    padding: 1rem 2rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--color-border);
+}
+
+.status-indicator.connected {
+    background-color: var(--color-well);
+}
+
+.status-indicator.disconnected {
+    background-color: #f44336;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: opacity 0.2s;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background-color: var(--color-text);
+    color: var(--color-white);
+}
+
+.btn-add {
+    background-color: transparent;
+    color: var(--color-text-light);
+    border: 2px dashed var(--color-border);
+    width: 100%;
+    padding: 0.75rem;
+}
+
+.btn-add:hover {
+    border-color: var(--color-text-light);
+    color: var(--color-text);
+}
+
+.board {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.column {
+    background-color: var(--color-white);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.column[data-column="well"] {
+    border-top: 4px solid var(--color-well);
+}
+
+.column[data-column="delta"] {
+    border-top: 4px solid var(--color-delta);
+}
+
+.column-header {
+    margin-bottom: 1rem;
+}
+
+.column-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-height: 200px;
+}
+
+.card {
+    background-color: var(--color-bg);
+    border-radius: var(--radius);
+    padding: 1rem;
+    position: relative;
+}
+
+.column[data-column="well"] .card {
+    background-color: var(--color-well-bg);
+}
+
+.column[data-column="delta"] .card {
+    background-color: var(--color-delta-bg);
+}
+
+.card-content {
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.card-content[contenteditable="true"] {
+    outline: none;
+    background-color: var(--color-white);
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--color-border);
+}
+
+.card-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.vote-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--color-text-light);
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.vote-btn:hover {
+    background-color: rgba(255, 152, 0, 0.1);
+}
+
+.vote-btn.voted {
+    color: var(--color-vote);
+}
+
+.vote-count {
+    font-weight: 600;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-light);
+    font-size: 1rem;
+    padding: 0.25rem;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.card:hover .delete-btn {
+    opacity: 1;
+}
+
+.delete-btn:hover {
+    color: #f44336;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .board {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+        gap: 1rem;
+    }
+}

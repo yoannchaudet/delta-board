@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta Board</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1 id="board-title">Delta Board</h1>
+        <div class="header-actions">
+            <span id="connection-status" class="status-indicator"></span>
+            <button id="export-btn" class="btn btn-secondary">Export to Markdown</button>
+        </div>
+    </header>
+
+    <main class="board">
+        <section class="column" data-column="well">
+            <div class="column-header">
+                <h2>What Went Well</h2>
+                <button class="btn btn-add" data-column="well">+ Add Card</button>
+            </div>
+            <div class="cards" id="well-cards"></div>
+        </section>
+
+        <section class="column" data-column="delta">
+            <div class="column-header">
+                <h2>Delta</h2>
+                <button class="btn btn-add" data-column="delta">+ Add Card</button>
+            </div>
+            <div class="cards" id="delta-cards"></div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

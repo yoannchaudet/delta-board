@@ -1,0 +1,33 @@
+# .NET
+bin/
+obj/
+*.sln
+*.dll
+*.pdb
+*.exe
+*.nupkg
+*.snupkg
+project.assets.json
+*.nuget.props
+*.nuget.targets
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# IDE
+.idea/
+.vs/
+*.swp
+*~
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Claude Code local settings
+.claude/settings.local.json
