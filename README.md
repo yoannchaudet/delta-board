@@ -30,13 +30,11 @@ A lightweight, privacy-first retrospective tool for teams to collaboratively ref
 ```
 delta-board/
 ├── server/              # C# WebSocket server
-│   ├── DeltaBoard.Server/
-│   └── README.md
+│   └── DeltaBoard.Server/
 ├── client/              # Web application
 │   ├── index.html
 │   ├── app.js
-│   ├── styles.css
-│   └── README.md
+│   └── styles.css
 ├── docs/
 │   └── DESIGN.md       # Detailed design documentation
 └── README.md
