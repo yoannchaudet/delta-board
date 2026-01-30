@@ -1,7 +1,22 @@
 // Board and ID generation utilities
 
-export const ADJECTIVES = ['bright', 'calm', 'bold', 'swift', 'keen', 'warm', 'cool', 'wise', 'fair', 'true'];
-export const NOUNS = ['delta', 'spark', 'wave', 'peak', 'flow', 'path', 'bloom', 'light', 'wind', 'star'];
+// Board ID format: board-{adjective}-{noun}-{hash}
+// Total combinations: 20 adjectives × 20 nouns × 36^4 hash = 671,846,400 unique boards
+// Collision probability is negligible for typical usage
+
+export const ADJECTIVES = [
+    'sleepy', 'grumpy', 'sneaky', 'wobbly', 'fuzzy',
+    'bouncy', 'clumsy', 'sassy', 'zesty', 'quirky',
+    'sparkly', 'fluffy', 'chunky', 'snazzy', 'zippy',
+    'wiggly', 'giggly', 'cosmic', 'turbo', 'mighty'
+];
+
+export const NOUNS = [
+    'penguin', 'llama', 'platypus', 'narwhal', 'capybara',
+    'potato', 'pickle', 'waffle', 'pretzel', 'nugget',
+    'wizard', 'ninja', 'pirate', 'unicorn', 'yeti',
+    'banana', 'avocado', 'coconut', 'noodle', 'taco'
+];
 
 export function generateBoardId() {
     const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
