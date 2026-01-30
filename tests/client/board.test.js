@@ -12,14 +12,14 @@ describe('board', () => {
     describe('generateBoardId', () => {
         it('should generate a board ID with correct format', () => {
             const id = generateBoardId();
-            expect(id).toMatch(/^board-[a-z]+-[a-z]+-[a-z0-9]{4}$/);
+            expect(id).toMatch(/^[a-z]+-[a-z]+-[a-z0-9]{4}$/);
         });
 
         it('should use adjectives and nouns from the word lists', () => {
             const id = generateBoardId();
             const parts = id.split('-');
-            expect(ADJECTIVES).toContain(parts[1]);
-            expect(NOUNS).toContain(parts[2]);
+            expect(ADJECTIVES).toContain(parts[0]);
+            expect(NOUNS).toContain(parts[1]);
         });
 
         it('should generate unique IDs', () => {

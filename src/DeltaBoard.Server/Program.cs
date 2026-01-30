@@ -12,7 +12,8 @@ app.UseWebSockets();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.Map("/ws/{boardId}", async (HttpContext context, BoardHub hub, IHostApplicationLifetime lifetime, string boardId) =>
+// WebSocket endpoint for board collaboration
+app.Map("/board/{boardId}/ws", async (HttpContext context, BoardHub hub, IHostApplicationLifetime lifetime, string boardId) =>
 {
     if (!context.WebSockets.IsWebSocketRequest)
     {
@@ -27,6 +28,14 @@ app.Map("/ws/{boardId}", async (HttpContext context, BoardHub hub, IHostApplicat
 
     using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
     await hub.HandleConnection(boardId, webSocket, cts.Token);
+});
+
+// SPA fallback: serve index.html for board routes
+app.MapGet("/board/{boardId}", async context =>
+{
+    context.Response.ContentType = "text/html";
+    await context.Response.SendFileAsync(
+        Path.Combine(app.Environment.WebRootPath, "index.html"));
 });
 
 app.MapGet("/health", () => "OK");

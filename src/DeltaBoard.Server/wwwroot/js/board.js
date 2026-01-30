@@ -1,6 +1,7 @@
 // Board and ID generation utilities
 
-// Board ID format: board-{adjective}-{noun}-{hash}
+// Board ID format: {adjective}-{noun}-{hash}
+// URL format: /board/{boardId} (e.g., /board/sleepy-penguin-a3f9)
 // Total combinations: 20 adjectives × 20 nouns × 36^4 hash = 671,846,400 unique boards
 // Collision probability is negligible for typical usage
 
@@ -22,7 +23,7 @@ export function generateBoardId() {
     const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
     const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
     const hash = Math.random().toString(36).substring(2, 6);
-    return `board-${adj}-${noun}-${hash}`;
+    return `${adj}-${noun}-${hash}`;
 }
 
 export function generateCardId() {

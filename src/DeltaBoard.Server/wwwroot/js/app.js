@@ -6,13 +6,20 @@ import * as sync from './sync.js';
 
 // === State Management ===
 
+const BOARD_PATH_PREFIX = '/board/';
+
 function getBoardId() {
-    let boardId = window.location.hash.slice(1);
-    if (!boardId) {
-        boardId = generateBoardId();
-        window.location.hash = boardId;
+    const path = window.location.pathname;
+
+    // Check if we're on a board route
+    if (path.startsWith(BOARD_PATH_PREFIX)) {
+        return path.slice(BOARD_PATH_PREFIX.length);
     }
-    return boardId;
+
+    // Not on a board route - redirect to a new board
+    const newBoardId = generateBoardId();
+    window.location.href = `${BOARD_PATH_PREFIX}${newBoardId}`;
+    return newBoardId; // Won't actually be used due to redirect
 }
 
 function getClientId() {
@@ -132,7 +139,7 @@ const maxReconnectAttempts = 10;
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/${boardId}`;
+    const wsUrl = `${protocol}//${window.location.host}/board/${boardId}/ws`;
 
     try {
         ws = new WebSocket(wsUrl);
@@ -322,6 +329,3 @@ document.addEventListener('DOMContentLoaded', () => {
     connectWebSocket();
 });
 
-window.addEventListener('hashchange', () => {
-    window.location.reload();
-});
