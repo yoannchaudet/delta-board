@@ -1,5 +1,4 @@
 using DeltaBoard.Server;
-using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,19 +8,9 @@ var app = builder.Build();
 
 app.UseWebSockets();
 
-// Serve static files from the client directory
-var clientPath = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "client"));
-if (Directory.Exists(clientPath))
-{
-    app.UseDefaultFiles(new DefaultFilesOptions
-    {
-        FileProvider = new PhysicalFileProvider(clientPath)
-    });
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(clientPath)
-    });
-}
+// Serve static files from wwwroot
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.Map("/ws/{boardId}", async (HttpContext context, BoardHub hub, string boardId) =>
 {

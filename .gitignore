@@ -1,7 +1,6 @@
 # .NET
 bin/
 obj/
-*.sln
 *.dll
 *.pdb
 *.exe
@@ -28,6 +27,9 @@ project.assets.json
 
 # Logs
 *.log
+
+# Node.js
+node_modules/
 
 # Claude Code local settings
 .claude/settings.local.json

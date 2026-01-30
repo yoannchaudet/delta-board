@@ -29,29 +29,49 @@ A lightweight, privacy-first retrospective tool for teams to collaboratively ref
 
 ```
 delta-board/
-├── server/              # C# WebSocket server
-│   └── DeltaBoard.Server/
-├── client/              # Web application
-│   ├── index.html
-│   ├── app.js
-│   └── styles.css
+├── src/
+│   └── DeltaBoard.Server/       # C# server (serves API + static files)
+│       ├── wwwroot/             # Client web application
+│       │   ├── index.html
+│       │   ├── css/
+│       │   │   └── styles.css
+│       │   └── js/
+│       │       └── app.js
+│       ├── Program.cs
+│       ├── BoardHub.cs
+│       └── DeltaBoard.Server.csproj
+├── tests/
+│   ├── DeltaBoard.Server.Tests/ # C# xUnit tests
+│   └── client/                  # JavaScript Vitest tests
 ├── docs/
-│   └── DESIGN.md       # Detailed design documentation
-└── README.md
+│   ├── DESIGN.md               # Technical design documentation
+│   └── PROTOCOL.md             # WebSocket protocol specification
+├── package.json                # JS test tooling
+├── vitest.config.js
+└── delta-board.sln
 ```
 
 ## Getting Started
 
-### Server
+### Run the Server
 
 ```bash
-cd server/DeltaBoard.Server
+cd src/DeltaBoard.Server
 dotnet run
 ```
 
-### Client
+The server starts at `http://localhost:5000` and serves both the web application and WebSocket API.
 
-Simply open `client/index.html` in a browser, or serve via any static file server.
+### Run Tests
+
+```bash
+# Server tests (C#)
+dotnet test
+
+# Client tests (JavaScript)
+npm install
+npm test
+```
 
 ## Documentation
 
