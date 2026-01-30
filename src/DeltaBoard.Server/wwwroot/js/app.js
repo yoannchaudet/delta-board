@@ -1,13 +1,10 @@
-// Board State Management
-const ADJECTIVES = ['bright', 'calm', 'bold', 'swift', 'keen', 'warm', 'cool', 'wise', 'fair', 'true'];
-const NOUNS = ['delta', 'spark', 'wave', 'peak', 'flow', 'path', 'bloom', 'light', 'wind', 'star'];
+// Delta Board - Main Application Entry Point
 
-function generateBoardId() {
-    const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-    const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-    const hash = Math.random().toString(36).substring(2, 6);
-    return `board-${adj}-${noun}-${hash}`;
-}
+import { generateBoardId, generateClientId, createEmptyState } from './board.js';
+import * as ops from './operations.js';
+import * as sync from './sync.js';
+
+// === State Management ===
 
 function getBoardId() {
     let boardId = window.location.hash.slice(1);
@@ -18,170 +15,99 @@ function getBoardId() {
     return boardId;
 }
 
-function generateCardId() {
-    return `card-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-}
-
 function getClientId() {
     let clientId = localStorage.getItem('deltaboard-client-id');
     if (!clientId) {
-        clientId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        clientId = generateClientId();
         localStorage.setItem('deltaboard-client-id', clientId);
     }
     return clientId;
 }
 
-// State
-const boardId = getBoardId();
-const clientId = getClientId();
-let state = loadState();
-
-function loadState() {
+function loadState(boardId) {
     const saved = localStorage.getItem(`deltaboard-${boardId}`);
     if (saved) {
         return JSON.parse(saved);
     }
-    return {
-        id: boardId,
-        cards: [],
-        votes: {}
-    };
+    return createEmptyState(boardId);
 }
 
-function saveState() {
+function saveState(boardId, state) {
     localStorage.setItem(`deltaboard-${boardId}`, JSON.stringify(state));
 }
 
-// Operations
+// === Application State ===
+
+const boardId = getBoardId();
+const clientId = getClientId();
+let state = loadState(boardId);
+
+// === Operations (with side effects) ===
+
 function createCard(column, text) {
-    const card = {
-        id: generateCardId(),
-        column,
-        text,
-        owner: clientId,
-        createdAt: Date.now()
-    };
-    state.cards.push(card);
-    saveState();
+    const result = ops.createCard(state, { column, text, owner: clientId });
+    state = result.state;
+    saveState(boardId, state);
     renderCards();
-    broadcastOperation({ type: 'createCard', card });
-    return card;
+    broadcastOperation({ type: 'createCard', card: result.card });
+    return result.card;
 }
 
 function editCard(cardId, text) {
-    const card = state.cards.find(c => c.id === cardId);
-    if (card) {
-        card.text = text;
-        saveState();
+    const newState = ops.editCard(state, cardId, text);
+    if (newState !== state) {
+        state = newState;
+        saveState(boardId, state);
         broadcastOperation({ type: 'editCard', cardId, text });
     }
 }
 
 function deleteCard(cardId) {
-    const index = state.cards.findIndex(c => c.id === cardId);
-    if (index !== -1) {
-        state.cards.splice(index, 1);
-        delete state.votes[cardId];
-        saveState();
+    const newState = ops.deleteCard(state, cardId);
+    if (newState !== state) {
+        state = newState;
+        saveState(boardId, state);
         renderCards();
         broadcastOperation({ type: 'deleteCard', cardId });
     }
 }
 
-function addVote(cardId) {
-    if (!state.votes[cardId]) {
-        state.votes[cardId] = [];
-    }
-    if (!state.votes[cardId].includes(clientId)) {
-        state.votes[cardId].push(clientId);
-        saveState();
-        renderCards();
+function toggleVote(cardId) {
+    const hadVote = ops.hasVoted(state, cardId, clientId);
+    state = ops.toggleVote(state, cardId, clientId);
+    saveState(boardId, state);
+    renderCards();
+
+    if (hadVote) {
+        broadcastOperation({ type: 'removeVote', cardId, voterId: clientId });
+    } else {
         broadcastOperation({ type: 'addVote', cardId, voterId: clientId });
     }
 }
 
-function removeVote(cardId) {
-    if (state.votes[cardId]) {
-        const index = state.votes[cardId].indexOf(clientId);
-        if (index !== -1) {
-            state.votes[cardId].splice(index, 1);
-            saveState();
-            renderCards();
-            broadcastOperation({ type: 'removeVote', cardId, voterId: clientId });
-        }
-    }
-}
+// === Remote Operations ===
 
-function toggleVote(cardId) {
-    if (state.votes[cardId]?.includes(clientId)) {
-        removeVote(cardId);
-    } else {
-        addVote(cardId);
-    }
-}
-
-// Apply remote operations
-function applyOperation(op) {
-    switch (op.type) {
+function applyRemoteOperation(operation) {
+    switch (operation.type) {
         case 'requestSync':
-            // Another client is requesting sync, send them our state
-            sendSyncState(op._connectionId);
+            sendSyncState(operation._connectionId);
             break;
 
         case 'syncState':
-            // Received state from another client, merge it
-            // We process ALL syncState messages for resilience against partitioned clients
-            mergeState(op.state);
+            state = sync.mergeState(state, operation.state);
+            saveState(boardId, state);
+            renderCards();
             break;
 
-        case 'createCard':
-            if (!state.cards.find(c => c.id === op.card.id)) {
-                state.cards.push(op.card);
-                saveState();
+        default: {
+            const result = sync.applyOperation(state, operation);
+            if (result.handled) {
+                state = result.state;
+                saveState(boardId, state);
                 renderCards();
             }
             break;
-
-        case 'editCard':
-            const cardToEdit = state.cards.find(c => c.id === op.cardId);
-            if (cardToEdit) {
-                cardToEdit.text = op.text;
-                saveState();
-                renderCards();
-            }
-            break;
-
-        case 'deleteCard':
-            const delIndex = state.cards.findIndex(c => c.id === op.cardId);
-            if (delIndex !== -1) {
-                state.cards.splice(delIndex, 1);
-                delete state.votes[op.cardId];
-                saveState();
-                renderCards();
-            }
-            break;
-
-        case 'addVote':
-            if (!state.votes[op.cardId]) {
-                state.votes[op.cardId] = [];
-            }
-            if (!state.votes[op.cardId].includes(op.voterId)) {
-                state.votes[op.cardId].push(op.voterId);
-                saveState();
-                renderCards();
-            }
-            break;
-
-        case 'removeVote':
-            if (state.votes[op.cardId]) {
-                const voteIndex = state.votes[op.cardId].indexOf(op.voterId);
-                if (voteIndex !== -1) {
-                    state.votes[op.cardId].splice(voteIndex, 1);
-                    saveState();
-                    renderCards();
-                }
-            }
-            break;
+        }
     }
 }
 
@@ -198,37 +124,8 @@ function sendSyncState(targetConnectionId) {
     }
 }
 
-function mergeState(remoteState) {
-    if (!remoteState) return;
+// === WebSocket ===
 
-    // Merge cards (add any we don't have)
-    if (remoteState.cards) {
-        for (const card of remoteState.cards) {
-            if (!state.cards.find(c => c.id === card.id)) {
-                state.cards.push(card);
-            }
-        }
-    }
-
-    // Merge votes (union of voter IDs)
-    if (remoteState.votes) {
-        for (const [cardId, voters] of Object.entries(remoteState.votes)) {
-            if (!state.votes[cardId]) {
-                state.votes[cardId] = [];
-            }
-            for (const voter of voters) {
-                if (!state.votes[cardId].includes(voter)) {
-                    state.votes[cardId].push(voter);
-                }
-            }
-        }
-    }
-
-    saveState();
-    renderCards();
-}
-
-// WebSocket
 let ws = null;
 let reconnectAttempts = 0;
 const maxReconnectAttempts = 10;
@@ -243,7 +140,6 @@ function connectWebSocket() {
         ws.onopen = () => {
             reconnectAttempts = 0;
             updateConnectionStatus('connected', 'Connected - changes sync in real-time');
-            // Request state from other participants
             ws.send(JSON.stringify({ type: 'requestSync' }));
         };
 
@@ -265,13 +161,13 @@ function connectWebSocket() {
         };
 
         ws.onerror = () => {
-            // Error will trigger onclose, no need to handle separately
+            // Error will trigger onclose
         };
 
         ws.onmessage = (event) => {
             try {
-                const op = JSON.parse(event.data);
-                applyOperation(op);
+                const operation = JSON.parse(event.data);
+                applyRemoteOperation(operation);
             } catch (e) {
                 console.error('Failed to parse message:', e);
             }
@@ -282,9 +178,9 @@ function connectWebSocket() {
     }
 }
 
-function broadcastOperation(op) {
+function broadcastOperation(operation) {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(op));
+        ws.send(JSON.stringify(operation));
     }
 }
 
@@ -294,7 +190,8 @@ function updateConnectionStatus(status, message = '') {
     indicator.title = message;
 }
 
-// Rendering
+// === Rendering ===
+
 function renderCards() {
     const wellContainer = document.getElementById('well-cards');
     const deltaContainer = document.getElementById('delta-cards');
@@ -302,8 +199,8 @@ function renderCards() {
     wellContainer.innerHTML = '';
     deltaContainer.innerHTML = '';
 
-    const wellCards = state.cards.filter(c => c.column === 'well');
-    const deltaCards = state.cards.filter(c => c.column === 'delta');
+    const wellCards = ops.getCardsByColumn(state, 'well');
+    const deltaCards = ops.getCardsByColumn(state, 'delta');
 
     wellCards.forEach(card => wellContainer.appendChild(createCardElement(card)));
     deltaCards.forEach(card => deltaContainer.appendChild(createCardElement(card)));
@@ -314,8 +211,8 @@ function createCardElement(card) {
     div.className = 'card';
     div.dataset.cardId = card.id;
 
-    const voteCount = state.votes[card.id]?.length || 0;
-    const hasVoted = state.votes[card.id]?.includes(clientId);
+    const voteCount = ops.getVoteCount(state, card.id);
+    const hasVoted = ops.hasVoted(state, card.id, clientId);
     const isOwner = card.owner === clientId;
 
     div.innerHTML = `
@@ -329,7 +226,6 @@ function createCardElement(card) {
         </div>
     `;
 
-    // Card content editing
     const content = div.querySelector('.card-content');
     if (isOwner) {
         content.addEventListener('click', () => {
@@ -359,11 +255,9 @@ function createCardElement(card) {
         });
     }
 
-    // Vote button
     const voteBtn = div.querySelector('.vote-btn');
     voteBtn.addEventListener('click', () => toggleVote(card.id));
 
-    // Delete button
     const deleteBtn = div.querySelector('.delete-btn');
     if (deleteBtn) {
         deleteBtn.addEventListener('click', () => deleteCard(card.id));
@@ -378,22 +272,23 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Export
+// === Export ===
+
 function exportToMarkdown() {
-    const wellCards = state.cards.filter(c => c.column === 'well');
-    const deltaCards = state.cards.filter(c => c.column === 'delta');
+    const wellCards = ops.getCardsByColumn(state, 'well');
+    const deltaCards = ops.getCardsByColumn(state, 'delta');
 
     let markdown = `# Retrospective - ${new Date().toLocaleDateString()}\n\n`;
 
     markdown += `## What Went Well\n\n`;
     wellCards.forEach(card => {
-        const votes = state.votes[card.id]?.length || 0;
+        const votes = ops.getVoteCount(state, card.id);
         markdown += `- ${card.text}${votes > 0 ? ` (${votes} vote${votes > 1 ? 's' : ''})` : ''}\n`;
     });
 
     markdown += `\n## Delta (What to Adjust)\n\n`;
     deltaCards.forEach(card => {
-        const votes = state.votes[card.id]?.length || 0;
+        const votes = ops.getVoteCount(state, card.id);
         markdown += `- ${card.text}${votes > 0 ? ` (${votes} vote${votes > 1 ? 's' : ''})` : ''}\n`;
     });
 
@@ -406,12 +301,11 @@ function exportToMarkdown() {
     URL.revokeObjectURL(url);
 }
 
-// Event Listeners
+// === Initialization ===
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Set board title
     document.getElementById('board-title').textContent = `Delta Board - ${boardId}`;
 
-    // Add card buttons
     document.querySelectorAll('.btn-add').forEach(btn => {
         btn.addEventListener('click', () => {
             const column = btn.dataset.column;
@@ -422,17 +316,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Export button
     document.getElementById('export-btn').addEventListener('click', exportToMarkdown);
 
-    // Initial render
     renderCards();
-
-    // Connect WebSocket
     connectWebSocket();
 });
 
-// Handle URL changes
 window.addEventListener('hashchange', () => {
     window.location.reload();
 });
