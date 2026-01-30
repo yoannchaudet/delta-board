@@ -11,7 +11,7 @@ public sealed class BoardHub
     private const int MaxParticipantsPerBoard = 20;
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, WebSocket>> _boards = [];
 
-    public async Task HandleConnection(string boardId, WebSocket webSocket)
+    public async Task HandleConnection(string boardId, WebSocket webSocket, CancellationToken cancellationToken)
     {
         var connectionId = Guid.NewGuid().ToString();
         var board = _boards.GetOrAdd(boardId, _ => []);
@@ -21,7 +21,7 @@ public sealed class BoardHub
             await webSocket.CloseAsync(
                 WebSocketCloseStatus.PolicyViolation,
                 "Board is full (max 20 participants)",
-                CancellationToken.None);
+                cancellationToken);
             return;
         }
 
@@ -29,7 +29,11 @@ public sealed class BoardHub
 
         try
         {
-            await ReceiveMessages(boardId, connectionId, webSocket);
+            await ReceiveMessages(boardId, connectionId, webSocket, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Server shutting down or request aborted - exit gracefully
         }
         finally
         {
@@ -41,13 +45,13 @@ public sealed class BoardHub
         }
     }
 
-    private async Task ReceiveMessages(string boardId, string senderId, WebSocket webSocket)
+    private async Task ReceiveMessages(string boardId, string senderId, WebSocket webSocket, CancellationToken cancellationToken)
     {
         var buffer = new byte[64 * 1024]; // 64KB for potentially large sync payloads
 
-        while (webSocket.State is WebSocketState.Open)
+        while (webSocket.State is WebSocketState.Open && !cancellationToken.IsCancellationRequested)
         {
-            var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+            var result = await webSocket.ReceiveAsync(buffer, cancellationToken);
 
             if (result.MessageType is WebSocketMessageType.Close)
             {

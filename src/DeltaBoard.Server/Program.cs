@@ -12,7 +12,7 @@ app.UseWebSockets();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.Map("/ws/{boardId}", async (HttpContext context, BoardHub hub, string boardId) =>
+app.Map("/ws/{boardId}", async (HttpContext context, BoardHub hub, IHostApplicationLifetime lifetime, string boardId) =>
 {
     if (!context.WebSockets.IsWebSocketRequest)
     {
@@ -20,8 +20,13 @@ app.Map("/ws/{boardId}", async (HttpContext context, BoardHub hub, string boardI
         return;
     }
 
+    // Link request abort with application shutdown for fast cleanup
+    using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+        context.RequestAborted,
+        lifetime.ApplicationStopping);
+
     using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-    await hub.HandleConnection(boardId, webSocket);
+    await hub.HandleConnection(boardId, webSocket, cts.Token);
 });
 
 app.MapGet("/health", () => "OK");
