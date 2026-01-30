@@ -41,3 +41,6 @@ app.MapGet("/board/{boardId}", async context =>
 app.MapGet("/health", () => "OK");
 
 app.Run();
+
+// Make Program accessible for integration tests
+public partial class Program;
