@@ -19,26 +19,26 @@ Keywords: warm, playful, supportive, simple, human
 
 ### Neutral Colors
 
-| Name             | Hex       | Usage                                     |
-| ---------------- | --------- | ----------------------------------------- |
-| **Warm White**   | `#fef8f5` | Page background                           |
-| **Light Cream**  | `#f5ebe5` | Header background                         |
-| **Card White**   | `#ffffff` | Card/panel backgrounds                    |
-| **Warm Brown**   | `#5b4237` | Mascot features, headings, header text    |
-| **Text**         | `#333333` | Body text                                 |
-| **Text Light**   | `#666666` | Secondary text, metadata                  |
-| **Border**       | `#e0e0e0` | Dividers, subtle borders                  |
+| Name            | Hex       | Usage                                  |
+| --------------- | --------- | -------------------------------------- |
+| **Warm White**  | `#fef8f5` | Page background                        |
+| **Light Cream** | `#f5ebe5` | Header background                      |
+| **Card White**  | `#ffffff` | Card/panel backgrounds                 |
+| **Warm Brown**  | `#5b4237` | Mascot features, headings, header text |
+| **Text**        | `#333333` | Body text                              |
+| **Text Light**  | `#666666` | Secondary text, metadata               |
+| **Border**      | `#e0e0e0` | Dividers, subtle borders               |
 
 ### Semantic Colors
 
-| Name              | Hex       | Usage                                      |
-| ----------------- | --------- | ------------------------------------------ |
-| **Well Green**    | `#4caf50` | "What Went Well" column accent             |
-| **Well Green BG** | `#e8f5e9` | Well card backgrounds                      |
-| **Delta Amber**   | `#f59e0b` | "Delta" column accent                      |
-| **Delta Amber BG**| `#fef3c7` | Delta card backgrounds                     |
-| **Vote Orange**   | `#ff9800` | Vote indicators, stars                     |
-| **Error Red**     | `#f44336` | Errors, delete actions, disconnected state |
+| Name               | Hex       | Usage                                      |
+| ------------------ | --------- | ------------------------------------------ |
+| **Well Green**     | `#4caf50` | "What Went Well" column accent             |
+| **Well Green BG**  | `#e8f5e9` | Well card backgrounds                      |
+| **Delta Amber**    | `#f59e0b` | "Delta" column accent                      |
+| **Delta Amber BG** | `#fef3c7` | Delta card backgrounds                     |
+| **Vote Orange**    | `#ff9800` | Vote indicators, stars                     |
+| **Error Red**      | `#f44336` | Errors, delete actions, disconnected state |
 
 ### Accent Shades (for mascot/illustrations)
 

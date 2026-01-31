@@ -38,7 +38,7 @@ This approach eliminates most concurrency issues and enables clean conflict reso
 Boards use human-readable URLs with collision-resistant hashing:
 
 ```
-deltaboard.app/board/sleepy-penguin-a3f9
+<domain>/board/sleepy-penguin-a3f9
 ```
 
 - **Board route**: `/board/{id}` - serves the SPA for a specific board
