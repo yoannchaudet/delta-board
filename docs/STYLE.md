@@ -19,14 +19,15 @@ Keywords: warm, playful, supportive, simple, human
 
 ### Neutral Colors
 
-| Name           | Hex       | Usage                                     |
-| -------------- | --------- | ----------------------------------------- |
-| **Warm White** | `#fef8f5` | Page background                           |
-| **Card White** | `#ffffff` | Card/panel backgrounds                    |
-| **Warm Brown** | `#5b4237` | Mascot features, can be used for headings |
-| **Text**       | `#333333` | Body text                                 |
-| **Text Light** | `#666666` | Secondary text, metadata                  |
-| **Border**     | `#e0e0e0` | Dividers, subtle borders                  |
+| Name             | Hex       | Usage                                     |
+| ---------------- | --------- | ----------------------------------------- |
+| **Warm White**   | `#fef8f5` | Page background                           |
+| **Light Cream**  | `#f5ebe5` | Header background                         |
+| **Card White**   | `#ffffff` | Card/panel backgrounds                    |
+| **Warm Brown**   | `#5b4237` | Mascot features, headings, header text    |
+| **Text**         | `#333333` | Body text                                 |
+| **Text Light**   | `#666666` | Secondary text, metadata                  |
+| **Border**       | `#e0e0e0` | Dividers, subtle borders                  |
 
 ### Semantic Colors
 
@@ -34,8 +35,8 @@ Keywords: warm, playful, supportive, simple, human
 | ----------------- | --------- | ------------------------------------------ |
 | **Well Green**    | `#4caf50` | "What Went Well" column accent             |
 | **Well Green BG** | `#e8f5e9` | Well card backgrounds                      |
-| **Delta Blue**    | `#2196f3` | "Delta" column accent                      |
-| **Delta Blue BG** | `#e3f2fd` | Delta card backgrounds                     |
+| **Delta Amber**   | `#f59e0b` | "Delta" column accent                      |
+| **Delta Amber BG**| `#fef3c7` | Delta card backgrounds                     |
 | **Vote Orange**   | `#ff9800` | Vote indicators, stars                     |
 | **Error Red**     | `#f44336` | Errors, delete actions, disconnected state |
 
@@ -103,16 +104,17 @@ The mascots have:
 **Primary** (Create, main actions)
 
 ```css
-background: #4caf50; /* or #fed443 for brand emphasis */
-color: white;
+background: #fed443;
+color: #5b4237;
 padding: 0.75rem 1.5rem;
 border-radius: 8px;
+font-weight: 600;
 ```
 
 **Secondary** (Export, minor actions)
 
 ```css
-background: #333333;
+background: #5b4237;
 color: white;
 ```
 
@@ -138,10 +140,17 @@ color: #666666;
 - Happy Delta mascot (optional, for empty state or hero)
 - Board cards on white with subtle shadow
 
+### Header
+
+- Light cream background (`#f5ebe5`)
+- Logo mark on the left, sized to match title (1.5rem)
+- Warm brown title text (`#5b4237`)
+- Secondary button in warm brown
+
 ### Board Page
 
 - Two-column layout
-- Color-coded column headers (green/blue top border)
+- Color-coded column headers (green/amber top border)
 - Cards inherit column color scheme
 
 ### Error Pages (404, 5xx)

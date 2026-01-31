@@ -323,6 +323,9 @@ function initBoard(id) {
     document.getElementById('landing-page').style.display = 'none';
     document.getElementById('board-page').style.display = '';
 
+    // Hide tagline on board view
+    document.getElementById('header-tagline').style.display = 'none';
+
     document.getElementById('board-title').textContent = `Delta Board - ${boardId}`;
 
     document.querySelectorAll('.btn-add').forEach(btn => {
