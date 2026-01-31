@@ -40,7 +40,10 @@ function loadState(boardId) {
     if (saved) {
         return JSON.parse(saved);
     }
-    return createEmptyState(boardId);
+    // Create and save empty state so board appears in boards list
+    const state = createEmptyState(boardId);
+    saveState(boardId, state);
+    return state;
 }
 
 function saveState(boardId, state) {
