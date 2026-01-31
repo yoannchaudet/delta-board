@@ -37,6 +37,13 @@ body {
     background-color: var(--color-bg);
     color: var(--color-text);
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+main, footer {
+    width: 100%;
 }
 
 header {
@@ -365,6 +372,24 @@ header h1 {
 
 .board-card-delete:hover {
     color: var(--color-error);
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    padding: 1.5rem 2rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--color-text-light);
+}
+
+footer a {
+    color: var(--color-text-light);
+    text-decoration: underline;
+}
+
+footer a:hover {
+    color: var(--color-text);
 }
 
 /* Responsive */

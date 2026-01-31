@@ -354,6 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show landing page, hide board
         document.getElementById('landing-page').style.display = '';
         document.getElementById('board-page').style.display = 'none';
+        // Hide board-specific header elements
+        document.querySelector('.header-actions').style.display = 'none';
         initLandingPage();
     } else {
         const id = getBoardId();
