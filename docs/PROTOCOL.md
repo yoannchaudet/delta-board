@@ -4,24 +4,20 @@ Delta Board uses WebSockets for real time collaboration between clients. The ser
 
 ## Message Types
 
-| Type                 | Direction                     | Description                               |
-| -------------------- | ----------------------------- | ----------------------------------------- |
-| `hello`              | Client → Server               | Initial handshake, includes clientId      |
-| `welcome`            | Server → Client               | Returns current phase and presence info   |
-| `presenceUpdate`     | Server → Clients              | Broadcast when participants join or leave |
-| `setReady`           | Client → Server               | Participant updates readiness state       |
-| `readyUpdate`        | Server → Clients              | Broadcast updated readiness counts        |
-| `requestPhaseChange` | Client → Server               | Request transition to reviewing           |
-| `phaseChanged`       | Server → Clients              | Authoritative phase transition event      |
-| `requestSync`        | Client → Server               | Request state from other clients          |
-| `syncState`          | Client → Client (via Server)  | Send full board state to a requester      |
-| `createCard`         | Client → Clients (via Server) | Broadcast new card creation               |
-| `editCard`           | Client → Clients (via Server) | Broadcast card text update                |
-| `deleteCard`         | Client → Clients (via Server) | Broadcast card deletion                   |
-| `addVote`            | Client → Clients (via Server) | Broadcast vote added                      |
-| `removeVote`         | Client → Clients (via Server) | Broadcast vote removed                    |
-| `ping`               | Client → Server               | Heartbeat to indicate client is alive     |
-| `pong`               | Server → Client               | Acknowledges heartbeat                    |
+| Type                 | Direction                     | Description                                              |
+| -------------------- | ----------------------------- | -------------------------------------------------------- |
+| `hello`              | Client → Server               | Initial handshake, includes clientId                     |
+| `welcome`            | Server → Client               | Returns phase, participant counts, then initiates sync   |
+| `participantsUpdate` | Server → Clients              | Broadcast when presence or readiness changes             |
+| `setReady`           | Client → Server               | Participant updates readiness state                      |
+| `requestPhaseChange` | Client → Server               | Request transition to reviewing                          |
+| `phaseChanged`       | Server → Clients              | Authoritative phase transition event                     |
+| `syncState`          | Client → Client (via Server)  | Send full board state to a new client                    |
+| `cardOp`             | Client → Clients (via Server) | Card operation (create, edit, or delete)                 |
+| `vote`               | Client → Clients (via Server) | Vote operation (add or remove)                           |
+| `ping`               | Client → Server               | Heartbeat to indicate client is alive                    |
+| `pong`               | Server → Client               | Acknowledges heartbeat                                   |
+| `error`              | Server → Client               | Indicates an operation was rejected                      |
 
 ## Server Authority
 
@@ -31,7 +27,7 @@ The server is authoritative for:
 - Connected participant count
 - Readiness state per participant
 
-Clients must treat `phaseChanged`, `presenceUpdate`, and `readyUpdate` events from the server as the source of truth, even if their local state differs.
+Clients must treat `phaseChanged` and `participantsUpdate` events from the server as the source of truth, even if their local state differs.
 
 ## Connection Flow
 
@@ -44,14 +40,14 @@ sequenceDiagram
 
     C->>S: Connect to /ws/{boardId}
     C->>S: hello { clientId }
-    S->>C: welcome { phase, participantsCount }
+    S->>C: welcome { phase, participantsCount, readyCount }
 
-    S->>A: presenceUpdate
-    S->>B: presenceUpdate
+    S->>A: participantsUpdate
+    S->>B: participantsUpdate
 
-    C->>S: requestSync
-    S->>A: requestSync (target C)
-    S->>B: requestSync (target C)
+    Note over S: Server requests sync on behalf of C
+    S->>A: syncRequest (target C)
+    S->>B: syncRequest (target C)
     A->>S: syncState (to C)
     B->>S: syncState (to C)
     S->>C: syncState from A and B
@@ -60,15 +56,25 @@ sequenceDiagram
 
 ## Presence and Readiness
 
-The server maintains an in memory list of connected participants per board based on active WebSocket connections.
+The server maintains an in-memory list of connected participants per board based on active WebSocket connections.
 
-### Presence
+The `participantsUpdate` message combines both presence and readiness information:
 
-- When a participant connects or disconnects, the server broadcasts `presenceUpdate`
-- Clients use this to display participant counts and compute quorum
-- When a participant disconnects, their readiness state is removed along with their presence
+```json
+{
+  "type": "participantsUpdate",
+  "participantsCount": 5,
+  "readyCount": 3
+}
+```
 
-### Readiness
+This message is broadcast when:
+- A participant connects or disconnects
+- A participant changes their readiness state
+
+When a participant disconnects, their readiness state is automatically removed.
+
+Quorum is always calculated based on currently connected participants. When participants leave, quorum may be reached automatically and the server may allow or trigger a phase transition.
 
 ```mermaid
 sequenceDiagram
@@ -78,11 +84,11 @@ sequenceDiagram
 
     A->>S: setReady { ready: true }
     S->>S: Update readiness set
-    S->>A: readyUpdate
-    S->>B: readyUpdate
+    S->>A: participantsUpdate { participantsCount: 2, readyCount: 1 }
+    S->>B: participantsUpdate { participantsCount: 2, readyCount: 1 }
 ```
 
-The server is authoritative for readiness counts and determines when quorum is reached.
+The server is authoritative for participant and readiness counts, and determines when quorum is reached.
 
 ## Phase Transition Flow
 
@@ -106,16 +112,44 @@ Rules:
 
 ## Phase Enforcement
 
-All board operations include the sender’s current understanding of the phase.
+All client operations (`cardOp`, `vote`) must include the sender’s current understanding of the board phase.
 
-The server validates operations against the current phase:
+The server validates operations against its authoritative phase:
 
 - During `forming`, card edits and votes are allowed
 - During `reviewing`, card edits and vote changes are rejected
 
-If an operation is invalid for the current phase, the server must ignore it and may optionally send an error response to the sender.
+If an operation’s phase does not match the server’s phase, it must be rejected.
+
+If an operation is rejected due to phase mismatch or invalid state, the server should send an `error` message back to the sender describing the reason. The operation must not be broadcast.
 
 ## Operation Broadcast Flow
+
+Card and vote operations use a unified format with an `action` field and unique operation ID:
+
+```json
+{
+  "type": "cardOp",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "create" | "edit" | "delete",
+  "cardId": "...",
+  "column": "well" | "delta",
+  "text": "...",
+  "authorId": "..."
+}
+```
+
+```json
+{
+  "type": "vote",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "add" | "remove",
+  "cardId": "...",
+  "voterId": "..."
+}
+```
 
 ```mermaid
 sequenceDiagram
@@ -124,19 +158,19 @@ sequenceDiagram
     participant B as Client B
     participant C as Client C
 
-    A->>S: createCard
-    S->>B: createCard
-    S->>C: createCard
+    A->>S: cardOp { action: create, ... }
+    S->>B: cardOp { action: create, ... }
+    S->>C: cardOp { action: create, ... }
     Note over B,C: Each client applies operation locally
 ```
 
-All operations should be idempotent. Clients must ignore duplicate operations based on operation or entity IDs to ensure consistent convergence across replicas.
+All operations are idempotent. Clients must ignore duplicates based on `opId` to ensure consistent convergence across replicas.
 
 ## State Sync
 
-When a client connects or reconnects, it requests state from all other participants.
+When a client connects, the server automatically requests state from all other participants on its behalf.
 
-All connected clients respond with their current board state using `syncState`. The requesting client merges all responses to build the most complete picture of the board.
+All connected clients respond with their current board state using `syncState`. The new client merges all responses to build the most complete picture of the board.
 
 This approach provides resilience against network partitions. If one client has stale or incomplete data, others may have the missing pieces.
 
@@ -172,6 +206,6 @@ If the server does not receive a `ping` or any other message from a client withi
 
 1. Closes the WebSocket connection
 2. Removes the participant from the presence list
-3. Broadcasts a `presenceUpdate` to the remaining clients
+3. Broadcasts a `participantsUpdate` to the remaining clients
 
 Heartbeats are used to maintain accurate connection health and presence information. They do not directly modify board content or participate in state synchronization. However, because presence affects readiness quorum, heartbeats indirectly influence when a phase transition is allowed.
