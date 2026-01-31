@@ -5,16 +5,28 @@
 }
 
 :root {
-    --color-bg: #f5f5f5;
+    /* Brand colors */
+    --color-brand: #fed443;
+    --color-brand-dark: #cf8f26;
+    --color-brand-highlight: #ebb00b;
+
+    /* Neutral colors */
+    --color-bg: #fef8f5;
     --color-white: #ffffff;
     --color-text: #333333;
     --color-text-light: #666666;
+    --color-brown: #5b4237;
     --color-border: #e0e0e0;
+
+    /* Semantic colors */
     --color-well: #4caf50;
     --color-well-bg: #e8f5e9;
     --color-delta: #2196f3;
     --color-delta-bg: #e3f2fd;
     --color-vote: #ff9800;
+    --color-error: #f44336;
+
+    /* Effects */
     --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     --radius: 8px;
 }
@@ -59,7 +71,7 @@ header h1 {
 }
 
 .status-indicator.disconnected {
-    background-color: #f44336;
+    background-color: var(--color-error);
 }
 
 .btn {
@@ -214,7 +226,7 @@ header h1 {
 }
 
 .delete-btn:hover {
-    color: #f44336;
+    color: var(--color-error);
 }
 
 /* Landing Page */
@@ -246,10 +258,16 @@ header h1 {
 }
 
 .btn-primary {
-    background-color: var(--color-well);
-    color: var(--color-white);
+    background-color: var(--color-brand);
+    color: var(--color-brown);
     padding: 0.75rem 1.5rem;
     font-size: 1rem;
+    font-weight: 600;
+}
+
+.btn-primary:hover {
+    background-color: var(--color-brand-dark);
+    color: var(--color-white);
 }
 
 .boards-section {
@@ -321,7 +339,7 @@ header h1 {
 }
 
 .board-card-delete:hover {
-    color: #f44336;
+    color: var(--color-error);
 }
 
 /* Responsive */
