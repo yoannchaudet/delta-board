@@ -217,6 +217,113 @@ header h1 {
     color: #f44336;
 }
 
+/* Landing Page */
+.landing {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.landing-hero {
+    text-align: center;
+    padding: 3rem 2rem;
+    background-color: var(--color-white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+}
+
+.landing-hero h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.landing-hero p {
+    color: var(--color-text-light);
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+.btn-primary {
+    background-color: var(--color-well);
+    color: var(--color-white);
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+.boards-section {
+    background-color: var(--color-white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+}
+
+.boards-section h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.boards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.board-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: var(--color-bg);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.2s;
+}
+
+.board-card:hover {
+    background-color: var(--color-border);
+}
+
+.board-card-content {
+    flex: 1;
+}
+
+.board-card-title {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.board-card-meta {
+    font-size: 0.875rem;
+    color: var(--color-text-light);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.board-card-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-text-light);
+    font-size: 1.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.board-card:hover .board-card-delete {
+    opacity: 1;
+}
+
+.board-card-delete:hover {
+    color: #f44336;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     header {
@@ -229,5 +336,17 @@ header h1 {
         grid-template-columns: 1fr;
         padding: 1rem;
         gap: 1rem;
+    }
+
+    .landing {
+        padding: 1rem;
+    }
+
+    .landing-hero {
+        padding: 2rem 1rem;
+    }
+
+    .board-card-delete {
+        opacity: 1;
     }
 }

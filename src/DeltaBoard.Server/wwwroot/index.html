@@ -15,7 +15,20 @@
         </div>
     </header>
 
-    <main class="board">
+    <main id="landing-page" class="landing" style="display: none;">
+        <section class="landing-hero">
+            <h2>Simple retrospectives for teams</h2>
+            <p>Create a board, share the link, and start collaborating in real-time.</p>
+            <button id="create-board-btn" class="btn btn-primary">Create New Board</button>
+        </section>
+
+        <section id="boards-section" class="boards-section" style="display: none;">
+            <h2>Your Boards</h2>
+            <div id="boards-list" class="boards-list"></div>
+        </section>
+    </main>
+
+    <main id="board-page" class="board" style="display: none;">
         <section class="column" data-column="well">
             <div class="column-header">
                 <h2>What Went Well</h2>

@@ -3,10 +3,16 @@
 import { generateBoardId, generateClientId, createEmptyState } from './board.js';
 import * as ops from './operations.js';
 import * as sync from './sync.js';
+import { initLandingPage } from './landing.js';
 
 // === State Management ===
 
 const BOARD_PATH_PREFIX = '/board/';
+
+function isLandingPage() {
+    const path = window.location.pathname;
+    return path === '/' || path === '/index.html';
+}
 
 function getBoardId() {
     const path = window.location.pathname;
@@ -16,10 +22,8 @@ function getBoardId() {
         return path.slice(BOARD_PATH_PREFIX.length);
     }
 
-    // Not on a board route - redirect to a new board
-    const newBoardId = generateBoardId();
-    window.location.href = `${BOARD_PATH_PREFIX}${newBoardId}`;
-    return newBoardId; // Won't actually be used due to redirect
+    // Not on a board route - return null (landing page handles this)
+    return null;
 }
 
 function getClientId() {
@@ -45,9 +49,9 @@ function saveState(boardId, state) {
 
 // === Application State ===
 
-const boardId = getBoardId();
-const clientId = getClientId();
-let state = loadState(boardId);
+let boardId = null;
+let clientId = null;
+let state = null;
 
 // === Operations (with side effects) ===
 
@@ -308,9 +312,17 @@ function exportToMarkdown() {
     URL.revokeObjectURL(url);
 }
 
-// === Initialization ===
+// === Board Initialization ===
 
-document.addEventListener('DOMContentLoaded', () => {
+function initBoard(id) {
+    boardId = id;
+    clientId = getClientId();
+    state = loadState(boardId);
+
+    // Show board page, hide landing
+    document.getElementById('landing-page').style.display = 'none';
+    document.getElementById('board-page').style.display = '';
+
     document.getElementById('board-title').textContent = `Delta Board - ${boardId}`;
 
     document.querySelectorAll('.btn-add').forEach(btn => {
@@ -327,5 +339,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderCards();
     connectWebSocket();
+}
+
+// === Initialization ===
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (isLandingPage()) {
+        // Show landing page, hide board
+        document.getElementById('landing-page').style.display = '';
+        document.getElementById('board-page').style.display = 'none';
+        initLandingPage();
+    } else {
+        const id = getBoardId();
+        if (id) {
+            initBoard(id);
+        }
+    }
 });
 
