@@ -229,20 +229,35 @@ function createCardElement(card) {
     const hasVoted = ops.hasVoted(state, card.id, clientId);
     const isOwner = card.owner === clientId;
 
+    // Vote button text depends on ownership and vote count
+    let voteText;
+    if (isOwner) {
+        voteText = voteCount > 0 ? `+${voteCount}` : 'no votes';
+    } else {
+        voteText = voteCount > 0 ? `+${voteCount}` : 'vote!';
+    }
+
     div.innerHTML = `
         <div class="card-content">${escapeHtml(card.text)}</div>
         <div class="card-actions">
-            <button class="vote-btn ${hasVoted ? 'voted' : ''}">
-                <span>${hasVoted ? '★' : '☆'}</span>
-                <span class="vote-count">${voteCount}</span>
+            <button class="vote-btn ${hasVoted ? 'voted' : ''} ${isOwner ? 'disabled' : ''}" ${isOwner ? 'disabled' : ''} title="${isOwner ? 'You cannot vote on your own card' : (hasVoted ? 'Remove your vote for this card' : 'Vote for this card')}">
+                ${voteText}
             </button>
-            ${isOwner ? '<button class="delete-btn" title="Delete">×</button>' : ''}
+            ${isOwner ? `
+                <div class="card-owner-actions">
+                    <button class="edit-btn" title="Edit card"><span aria-hidden="true">✏️</span><span class="sr-only">Edit</span></button>
+                    <button class="delete-btn" title="Delete card"><span aria-hidden="true">🗑️</span><span class="sr-only">Delete</span></button>
+                </div>
+            ` : ''}
         </div>
     `;
 
     const content = div.querySelector('.card-content');
-    if (isOwner) {
-        content.addEventListener('click', () => {
+
+    // Edit button click handler (for owners)
+    const editBtn = div.querySelector('.edit-btn');
+    if (editBtn) {
+        editBtn.addEventListener('click', () => {
             content.contentEditable = 'true';
             content.focus();
         });
@@ -269,12 +284,19 @@ function createCardElement(card) {
         });
     }
 
+    // Vote button (only for non-owners)
     const voteBtn = div.querySelector('.vote-btn');
-    voteBtn.addEventListener('click', () => toggleVote(card.id));
+    if (!isOwner) {
+        voteBtn.addEventListener('click', () => toggleVote(card.id));
+    }
 
     const deleteBtn = div.querySelector('.delete-btn');
     if (deleteBtn) {
-        deleteBtn.addEventListener('click', () => deleteCard(card.id));
+        deleteBtn.addEventListener('click', () => {
+            if (confirm('Delete this card? This cannot be undone.')) {
+                deleteCard(card.id);
+            }
+        });
     }
 
     return div;

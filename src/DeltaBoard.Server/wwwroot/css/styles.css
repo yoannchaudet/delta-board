@@ -183,7 +183,9 @@ header h1 {
     background-color: var(--color-bg);
     border-radius: var(--radius);
     padding: 1rem;
-    position: relative;
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
 }
 
 .column[data-column="well"] .card {
@@ -195,7 +197,7 @@ header h1 {
 }
 
 .card-content {
-    margin-bottom: 0.75rem;
+    flex: 1;
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
@@ -205,60 +207,101 @@ header h1 {
     outline: none;
     background-color: var(--color-white);
     padding: 0.5rem;
+    margin: -0.5rem;
     border-radius: 4px;
     border: 1px solid var(--color-border);
 }
 
 .card-actions {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    gap: 0.25rem;
+    align-items: stretch;
 }
 
-.vote-btn {
-    background: none;
+/* Card action buttons base style */
+.card-actions button {
     border: none;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: var(--color-text-light);
+    border-radius: var(--radius);
     font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
     transition: all 0.2s;
 }
 
-.vote-btn:hover {
-    background-color: rgba(255, 152, 0, 0.1);
+.vote-btn {
+    padding: 0.5rem 0.75rem;
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+.column[data-column="well"] .vote-btn {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.column[data-column="well"] .vote-btn:hover:not(.disabled) {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.column[data-column="delta"] .vote-btn {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.column[data-column="delta"] .vote-btn:hover:not(.disabled) {
+    background-color: rgba(0, 0, 0, 0.15);
 }
 
 .vote-btn.voted {
     color: var(--color-vote);
-}
-
-.vote-count {
     font-weight: 600;
 }
 
+.vote-btn.disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.card-owner-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.edit-btn,
 .delete-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--color-text-light);
-    font-size: 1rem;
-    padding: 0.25rem;
-    border-radius: 4px;
-    opacity: 0;
-    transition: opacity 0.2s;
+    padding: 0.375rem 0.5rem;
+    line-height: 1;
 }
 
-.card:hover .delete-btn {
-    opacity: 1;
+.column[data-column="well"] .edit-btn,
+.column[data-column="well"] .delete-btn {
+    background-color: rgba(0, 0, 0, 0.08);
 }
 
-.delete-btn:hover {
-    color: var(--color-error);
+.column[data-column="well"] .edit-btn:hover,
+.column[data-column="well"] .delete-btn:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.column[data-column="delta"] .edit-btn,
+.column[data-column="delta"] .delete-btn {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.column[data-column="delta"] .edit-btn:hover,
+.column[data-column="delta"] .delete-btn:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Screen reader only */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* Landing Page */
