@@ -238,7 +238,7 @@ function createCardElement(card) {
         `;
     } else {
         if (hasVoted) {
-            controlsHtml = `<button class="card-control vote-btn voted">👎 Remove vote</button>`;
+            controlsHtml = `<button class="card-control vote-btn voted">Remove vote</button>`;
         } else {
             controlsHtml = `<button class="card-control vote-btn">👍 Vote</button>`;
         }
@@ -388,4 +388,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
-
