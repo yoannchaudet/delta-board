@@ -266,11 +266,11 @@ function createCardElement(card) {
 
         content.addEventListener('blur', () => {
             content.contentEditable = 'false';
-            const newText = content.textContent.trim();
+            const newText = content.innerText.trim();
             if (newText && newText !== card.text) {
                 editCard(card.id, newText);
             } else {
-                content.textContent = card.text;
+                content.innerText = card.text;
             }
         });
 
@@ -280,7 +280,7 @@ function createCardElement(card) {
                 content.blur();
             }
             if (e.key === 'Escape') {
-                content.textContent = card.text;
+                content.innerText = card.text;
                 content.blur();
             }
         });
