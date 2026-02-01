@@ -102,31 +102,31 @@ The server currently tracks connections but not client identity. Add:
 Implement merge rules from PROTOCOL.md:
 
 **Tasks:**
-- [ ] `mergeCard(local, remote)` — compare rev, then authorId, then isDeleted
-- [ ] `mergeVote(local, remote)` — compare rev, then voterId, then isDeleted
-- [ ] `mergePhase(local, remote)` — reviewing always wins
-- [ ] `mergeState(local, remote)` — merge all cards, votes, phase
-- [ ] Unit tests for merge edge cases
+- [x] `mergeCard(local, remote)` — compare rev, then authorId, then isDeleted
+- [x] `mergeVote(local, remote)` — compare rev, then voterId, then isDeleted
+- [x] `mergePhase(local, remote)` — reviewing always wins
+- [x] `mergeState(local, remote)` — merge all cards, votes, phase
+- [x] Unit tests for merge edge cases
 
 ### 2.2 Join-Time Sync Flow
 
 **File:** `wwwroot/js/sync.js` (rewrite)
 
 **Tasks:**
-- [ ] On `welcome`: request sync from existing clients (server notifies them)
-- [ ] Buffer incoming `cardOp`/`vote` messages during sync window (1-2s)
-- [ ] Collect `syncState` messages, merge them all
-- [ ] After sync window: apply buffered operations
-- [ ] If local state changed from merge: broadcast `syncState` once
+- [x] On `welcome`: request sync from existing clients (server notifies them)
+- [x] Buffer incoming `cardOp`/`vote` messages during sync window (1-2s)
+- [x] Collect `syncState` messages, merge them all
+- [x] After sync window: apply buffered operations
+- [x] If local state changed from merge: broadcast `syncState` once
 
 ### 2.3 opId Deduplication
 
 **File:** `wwwroot/js/dedup.js` (new)
 
 **Tasks:**
-- [ ] Maintain `Set<string>` of seen opIds (in-memory, session lifetime)
-- [ ] Check opId before applying any operation
-- [ ] Generate unique opIds: `${clientId}:${timestamp}:${counter}`
+- [x] Maintain `Set<string>` of seen opIds (in-memory, session lifetime)
+- [x] Check opId before applying any operation
+- [x] Generate unique opIds: `${clientId}:${timestamp}:${counter}`
 
 ---
 
