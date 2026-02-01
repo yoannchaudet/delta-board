@@ -476,6 +476,15 @@ Clients must validate outgoing and incoming operations:
 - `rev` is a non-decreasing integer per `(cardId, voterId)`
 - `cardId`/`opId`/`clientId` are valid ids
 
+## Implementation Rules
+
+- `authorId` and `voterId` MUST equal the sender's `clientId` (v1 has no separate user identity).
+- For cards: clients set `rev = (max rev seen for that card) + 1` when editing or deleting.
+- For votes: clients set `rev = (max rev seen for that (cardId, voterId)) + 1` when adding or removing.
+- Clients SHOULD persist current card/vote `rev` values as part of local state so reloads do not reset counters.
+- On join, clients SHOULD buffer incoming operations while collecting `syncState`, then apply buffered ops after the join-time merge completes.
+- `syncState` SHOULD be targeted using `targetClientId`. Broadcasting a `syncState` (omitting `targetClientId`) should only be done once after a join-time merge that changed local state.
+
 ## Client Identity
 
 Each client generates and persists a `clientId`.
