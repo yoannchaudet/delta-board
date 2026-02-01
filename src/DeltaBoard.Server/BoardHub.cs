@@ -18,7 +18,7 @@ public sealed class BoardHub
     private const int BufferSize = 64 * 1024; // 64KB for sync payloads
     private const int HelloTimeoutSeconds = 5;
     private const int InactivityTimeoutSeconds = 30;
-    private const int ReceiveTimeoutSeconds = 10; // Check interval for inactivity
+    private const int InactivityCheckSeconds = 5;
 
     // Board state: boardId → board data
     private readonly ConcurrentDictionary<string, BoardState> _boards = [];
@@ -178,15 +178,14 @@ public sealed class BoardHub
     private async Task ReceiveMessages(BoardState board, string clientId, WebSocket webSocket, CancellationToken cancellationToken)
     {
         var buffer = new byte[BufferSize];
+        using var inactivityCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var inactivityTask = MonitorInactivity(board, clientId, webSocket, inactivityCts.Token);
 
-        while (webSocket.State is WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+        try
         {
-            try
+            while (webSocket.State is WebSocketState.Open && !cancellationToken.IsCancellationRequested)
             {
-                using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                receiveCts.CancelAfter(TimeSpan.FromSeconds(ReceiveTimeoutSeconds));
-
-                var (messageType, message) = await ReceiveMessage(webSocket, BufferSize, receiveCts.Token);
+                var (messageType, message) = await ReceiveMessage(webSocket, BufferSize, cancellationToken);
 
                 // Update last activity timestamp
                 if (board.Participants.TryGetValue(clientId, out var participant))
@@ -210,23 +209,58 @@ public sealed class BoardHub
                     await HandleMessage(board, clientId, message);
                 }
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("WS receive canceled client={ClientId}", clientId);
+        }
+        catch (WebSocketException ex)
+        {
+            _logger.LogWarning(ex, "WS receive error client={ClientId} state={State}", clientId, webSocket.State);
+        }
+        finally
+        {
+            inactivityCts.Cancel();
+            await inactivityTask;
+        }
+    }
+
+    private async Task MonitorInactivity(
+        BoardState board,
+        string clientId,
+        WebSocket webSocket,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(InactivityCheckSeconds));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                // Receive timeout - check for inactivity
                 if (board.Participants.TryGetValue(clientId, out var participant))
                 {
                     var inactiveSeconds = (DateTime.UtcNow - participant.LastActivity).TotalSeconds;
                     if (inactiveSeconds >= InactivityTimeoutSeconds)
                     {
                         _logger.LogWarning("WS inactivity timeout client={ClientId} inactiveSeconds={InactiveSeconds}", clientId, inactiveSeconds);
-                        await webSocket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure,
-                            "Inactivity timeout",
-                            CancellationToken.None);
+                        if (webSocket.State is WebSocketState.Open)
+                        {
+                            await webSocket.CloseAsync(
+                                WebSocketCloseStatus.NormalClosure,
+                                "Inactivity timeout",
+                                CancellationToken.None);
+                        }
                         break;
                     }
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown
+        }
+        catch (WebSocketException ex)
+        {
+            _logger.LogWarning(ex, "WS inactivity monitor error client={ClientId} state={State}", clientId, webSocket.State);
         }
     }
 

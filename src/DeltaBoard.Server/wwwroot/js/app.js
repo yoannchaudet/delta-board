@@ -2,6 +2,8 @@
 
 import { initLandingPage } from './landing.js';
 import { createConnection } from './connection.js';
+import { createEmptyState, createCard } from './types.js';
+import { applyCardOp, getVisibleCards, getVoteCount } from './operations.js';
 
 /**
  * Detect current page from URL
@@ -51,6 +53,11 @@ function init() {
  */
 function initBoard(boardId) {
     const statusEl = document.getElementById('connection-status');
+    const wellCardsEl = document.getElementById('well-cards');
+    const deltaCardsEl = document.getElementById('delta-cards');
+    const addButtons = document.querySelectorAll('.btn-add');
+
+    let state = createEmptyState();
 
     const connection = createConnection(boardId, {
         onStateChange: (state) => {
@@ -63,8 +70,11 @@ function initBoard(boardId) {
         },
 
         onMessage: (message) => {
-            console.log('Received:', message);
-            // TODO: Handle cardOp, vote, syncState, phaseChanged
+            if (message.type === 'cardOp') {
+                handleCardOp(message);
+            } else {
+                console.log('Received:', message);
+            }
         },
 
         onAck: (opId) => {
@@ -83,6 +93,69 @@ function initBoard(boardId) {
 
     // Store connection for debugging
     window._connection = connection;
+
+    addButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const column = button.dataset.column;
+            if (!column) return;
+
+            const text = window.prompt('Card text');
+            if (!text) return;
+
+            const card = createCard(column, text, connection.getClientId());
+            const op = {
+                type: 'cardOp',
+                cardId: card.id,
+                column: card.column,
+                text: card.text,
+                authorId: card.authorId,
+                rev: card.rev,
+                isDeleted: card.isDeleted
+            };
+
+            handleCardOp(op);
+            connection.broadcast(op);
+        });
+    });
+
+    function handleCardOp(op) {
+        state = applyCardOp(state, op);
+        renderBoard();
+    }
+
+    function renderBoard() {
+        renderColumn(wellCardsEl, 'well');
+        renderColumn(deltaCardsEl, 'delta');
+    }
+
+    function renderColumn(container, column) {
+        container.innerHTML = '';
+        const cards = getVisibleCards(state, column);
+        for (const card of cards) {
+            container.appendChild(renderCard(card));
+        }
+    }
+
+    function renderCard(card) {
+        const el = document.createElement('div');
+        el.className = 'card';
+
+        const body = document.createElement('div');
+        body.className = 'card-body';
+
+        const content = document.createElement('div');
+        content.className = 'card-content';
+        content.textContent = card.text;
+
+        const votes = document.createElement('div');
+        votes.className = 'card-votes';
+        votes.textContent = String(getVoteCount(state, card.id));
+
+        body.appendChild(content);
+        body.appendChild(votes);
+        el.appendChild(body);
+        return el;
+    }
 }
 
 /**

@@ -4,6 +4,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<BoardHub>();
 
+builder.WebHost.UseUrls("http://localhost:5173");
+
 var app = builder.Build();
 
 app.UseWebSockets();

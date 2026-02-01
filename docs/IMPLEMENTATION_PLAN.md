@@ -165,6 +165,16 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 - [ ] Handle incoming messages by type: `cardOp`, `vote`, `syncState`, `participantsUpdate`, etc.
 - [ ] Route to appropriate handlers
 
+### 3.4 Board UI Wiring (Card Create)
+
+**File:** `wwwroot/js/app.js`
+
+**Tasks:**
+- [ ] Initialize local board state for the board page
+- [ ] Wire "+ Add Card" buttons to create local card ops and broadcast
+- [ ] Render cards from state (both columns)
+- [ ] Apply incoming `cardOp` messages to local state and re-render
+
 ---
 
 ## Phase 4: Phases & Readiness

@@ -60,7 +60,7 @@ cd src/DeltaBoard.Server
 dotnet run
 ```
 
-The server starts at `http://localhost:5000` and serves both the web application and WebSocket API.
+The server starts at `http://localhost:5173` and serves both the web application and WebSocket API.
 
 ### Run Tests
 

@@ -3,6 +3,7 @@
 import { getClientId } from './storage.js';
 
 const PING_INTERVAL_MS = 10000;
+const PONG_TIMEOUT_MS = 12000;
 const RECONNECT_MAX_ATTEMPTS = 10;
 const RECONNECT_MAX_DELAY_MS = 30000;
 
@@ -35,13 +36,19 @@ export function createConnection(boardId, callbacks = {}) {
     let state = 'disconnected';
 
     /** @type {number | null} */
-    let pingInterval = null;
+    let pingTimeout = null;
 
     /** @type {number | null} */
     let pongTimeout = null;
 
     /** @type {number} */
     let reconnectAttempts = 0;
+
+    /** @type {number} */
+    let opCounter = 0;
+
+    /** @type {boolean} */
+    let helloSent = false;
 
     /** @type {number | null} */
     let reconnectTimeout = null;
@@ -80,6 +87,7 @@ export function createConnection(boardId, callbacks = {}) {
                 const hello = { type: 'hello', clientId };
                 console.debug('[WS TX]', JSON.stringify(hello));
                 socket.send(JSON.stringify(hello));
+                helloSent = true;
             };
 
             socket.onmessage = (event) => {
@@ -143,6 +151,7 @@ export function createConnection(boardId, callbacks = {}) {
                     callbacks.onError?.(message.message);
                     if (state === 'handshaking') {
                         // Error during handshake - close connection
+                        console.log('[WS] Handshake error, closing connection');
                         socket?.close();
                     }
                     break;
@@ -159,13 +168,21 @@ export function createConnection(boardId, callbacks = {}) {
 
     function startPing() {
         stopPing();
-        pingInterval = setInterval(() => {
+        schedulePing();
+    }
+
+    function schedulePing() {
+        if (pingTimeout !== null) {
+            clearTimeout(pingTimeout);
+        }
+        pingTimeout = setTimeout(() => {
             if (socket?.readyState === WebSocket.OPEN) {
                 schedulePongTimeout();
                 const ping = JSON.stringify({ type: 'ping' });
                 console.debug('[WS TX]', ping);
                 socket.send(ping);
             }
+            schedulePing();
         }, PING_INTERVAL_MS);
     }
 
@@ -173,8 +190,9 @@ export function createConnection(boardId, callbacks = {}) {
         clearPongTimeout();
         pongTimeout = setTimeout(() => {
             // Missed pong: reconnect
+            console.debug('[WS] Pong timeout, reconnecting...');
             socket?.close();
-        }, PING_INTERVAL_MS + 2000);
+        }, PONG_TIMEOUT_MS);
     }
 
     function clearPongTimeout() {
@@ -185,9 +203,9 @@ export function createConnection(boardId, callbacks = {}) {
     }
 
     function stopPing() {
-        if (pingInterval !== null) {
-            clearInterval(pingInterval);
-            pingInterval = null;
+        if (pingTimeout !== null) {
+            clearTimeout(pingTimeout);
+            pingTimeout = null;
         }
         clearPongTimeout();
     }
@@ -215,10 +233,12 @@ export function createConnection(boardId, callbacks = {}) {
             reconnectTimeout = null;
         }
         socket = null;
+        helloSent = false;
     }
 
     function disconnect() {
         setState('closed');
+        console.debug('[WS] Disconnecting...');
         socket?.close();
         cleanup();
     }
@@ -228,9 +248,25 @@ export function createConnection(boardId, callbacks = {}) {
             const json = JSON.stringify(message);
             console.debug('[WS TX]', json);
             socket.send(json);
+            if (helloSent && state === 'ready') {
+                schedulePing();
+            }
             return true;
         }
         return false;
+    }
+
+    function generateOpId() {
+        opCounter += 1;
+        return `${clientId}:${Date.now()}:${opCounter}`;
+    }
+
+    function broadcast(message) {
+        if (!message.opId) {
+            message.opId = generateOpId();
+        }
+        const didSend = send(message);
+        return didSend ? message.opId : null;
     }
 
     // Public API
@@ -238,6 +274,7 @@ export function createConnection(boardId, callbacks = {}) {
         connect,
         disconnect,
         send,
+        broadcast,
         getClientId: () => clientId,
         getState: () => state,
         getParticipantCount: () => participantCount,
