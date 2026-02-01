@@ -71,3 +71,16 @@ export function deleteBoard(boardId) {
 export function hasBoards() {
     return getAllBoards().length > 0;
 }
+
+/**
+ * Get or create a persistent client ID
+ * @returns {string} The client ID
+ */
+export function getClientId() {
+    let clientId = localStorage.getItem(CLIENT_ID_KEY);
+    if (!clientId) {
+        clientId = `client-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+        localStorage.setItem(CLIENT_ID_KEY, clientId);
+    }
+    return clientId;
+}

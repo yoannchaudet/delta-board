@@ -106,6 +106,10 @@ header h1 {
     background-color: var(--color-error);
 }
 
+.status-indicator.connecting {
+    background-color: var(--color-delta);
+}
+
 .btn {
     padding: 0.5rem 1rem;
     border: none;

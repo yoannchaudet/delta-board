@@ -2,143 +2,356 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace DeltaBoard.Server;
 
 public sealed class BoardHub
 {
     private const int MaxParticipantsPerBoard = 20;
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, WebSocket>> _boards = [];
+    private const int BufferSize = 64 * 1024; // 64KB for sync payloads
+    private const int HelloTimeoutSeconds = 5;
+    private const int InactivityTimeoutSeconds = 30;
+    private const int ReceiveTimeoutSeconds = 10; // Check interval for inactivity
+
+    // Board state: boardId → board data
+    private readonly ConcurrentDictionary<string, BoardState> _boards = [];
 
     public async Task HandleConnection(string boardId, WebSocket webSocket, CancellationToken cancellationToken)
     {
-        var connectionId = Guid.NewGuid().ToString();
-        var board = _boards.GetOrAdd(boardId, _ => []);
+        var board = _boards.GetOrAdd(boardId, _ => new BoardState());
 
-        if (board.Count >= MaxParticipantsPerBoard)
+        // Check capacity before handshake
+        if (board.Participants.Count >= MaxParticipantsPerBoard)
         {
+            await SendError(webSocket, "Board is full (max 20 participants)", cancellationToken);
             await webSocket.CloseAsync(
                 WebSocketCloseStatus.PolicyViolation,
-                "Board is full (max 20 participants)",
+                "Board is full",
                 cancellationToken);
             return;
         }
 
-        board.TryAdd(connectionId, webSocket);
+        // Wait for hello message
+        var clientId = await WaitForHello(webSocket, cancellationToken);
+        if (clientId is null)
+        {
+            return; // Connection closed or invalid hello
+        }
+
+        // Check for duplicate clientId
+        if (!board.Participants.TryAdd(clientId, new ParticipantState(webSocket)))
+        {
+            await SendError(webSocket, "Client ID already connected to this board", cancellationToken);
+            await webSocket.CloseAsync(
+                WebSocketCloseStatus.PolicyViolation,
+                "Duplicate client ID",
+                cancellationToken);
+            return;
+        }
 
         try
         {
-            await ReceiveMessages(boardId, connectionId, webSocket, cancellationToken);
+            // Send welcome
+            await SendWelcome(webSocket, board, cancellationToken);
+
+            // Notify existing participants
+            await BroadcastParticipantsUpdate(board, clientId);
+
+            // Main message loop
+            await ReceiveMessages(board, clientId, webSocket, cancellationToken);
         }
         catch (OperationCanceledException)
         {
-            // Server shutting down or request aborted - exit gracefully
+            // Server shutting down or request aborted
         }
         finally
         {
-            board.TryRemove(connectionId, out _);
-            if (board.IsEmpty)
+            board.Participants.TryRemove(clientId, out _);
+            await BroadcastParticipantsUpdate(board, clientId);
+
+            if (board.Participants.IsEmpty)
             {
                 _boards.TryRemove(boardId, out _);
             }
         }
     }
 
-    private async Task ReceiveMessages(string boardId, string senderId, WebSocket webSocket, CancellationToken cancellationToken)
+    private static async Task<string?> WaitForHello(WebSocket webSocket, CancellationToken cancellationToken)
     {
-        var buffer = new byte[64 * 1024]; // 64KB for potentially large sync payloads
+        var buffer = new byte[1024];
 
-        while (webSocket.State is WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+        try
         {
-            var result = await webSocket.ReceiveAsync(buffer, cancellationToken);
+            using var helloCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            helloCts.CancelAfter(TimeSpan.FromSeconds(HelloTimeoutSeconds));
+
+            var result = await webSocket.ReceiveAsync(buffer, helloCts.Token);
 
             if (result.MessageType is WebSocketMessageType.Close)
             {
-                await webSocket.CloseAsync(
-                    WebSocketCloseStatus.NormalClosure,
-                    "Closing",
-                    CancellationToken.None);
-                break;
+                return null;
             }
 
             if (result.MessageType is WebSocketMessageType.Text)
             {
                 var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                await HandleMessage(boardId, senderId, message);
+                using var doc = JsonDocument.Parse(message);
+
+                if (doc.RootElement.TryGetProperty("type", out var typeEl) &&
+                    typeEl.GetString() == "hello" &&
+                    doc.RootElement.TryGetProperty("clientId", out var clientIdEl))
+                {
+                    return clientIdEl.GetString();
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Invalid JSON - fall through to close
+        }
+        catch (OperationCanceledException)
+        {
+            // Timeout or server shutdown - fall through to close
+        }
+
+        if (webSocket.State is WebSocketState.Open)
+        {
+            await webSocket.CloseAsync(
+                WebSocketCloseStatus.ProtocolError,
+                "Expected hello message",
+                CancellationToken.None);
+        }
+        return null;
+    }
+
+    private static async Task SendWelcome(WebSocket webSocket, BoardState board, CancellationToken cancellationToken)
+    {
+        var welcome = new
+        {
+            type = "welcome",
+            participantCount = board.Participants.Count,
+            readyCount = board.Participants.Values.Count(p => p.IsReady)
+        };
+
+        await SendJson(webSocket, welcome, cancellationToken);
+    }
+
+    private static async Task SendError(WebSocket webSocket, string message, CancellationToken cancellationToken)
+    {
+        var error = new { type = "error", message };
+        await SendJson(webSocket, error, cancellationToken);
+    }
+
+    private static async Task SendJson(WebSocket webSocket, object payload, CancellationToken cancellationToken)
+    {
+        if (webSocket.State is not WebSocketState.Open)
+            return;
+
+        var json = JsonSerializer.Serialize(payload);
+        var bytes = Encoding.UTF8.GetBytes(json);
+        await webSocket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
+    }
+
+    private async Task ReceiveMessages(BoardState board, string clientId, WebSocket webSocket, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[BufferSize];
+
+        while (webSocket.State is WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                receiveCts.CancelAfter(TimeSpan.FromSeconds(ReceiveTimeoutSeconds));
+
+                var result = await webSocket.ReceiveAsync(buffer, receiveCts.Token);
+
+                // Update last activity timestamp
+                if (board.Participants.TryGetValue(clientId, out var participant))
+                {
+                    participant.LastActivity = DateTime.UtcNow;
+                }
+
+                if (result.MessageType is WebSocketMessageType.Close)
+                {
+                    await webSocket.CloseAsync(
+                        WebSocketCloseStatus.NormalClosure,
+                        "Closing",
+                        CancellationToken.None);
+                    break;
+                }
+
+                if (result.MessageType is WebSocketMessageType.Text)
+                {
+                    var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    await HandleMessage(board, clientId, message);
+                }
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Receive timeout - check for inactivity
+                if (board.Participants.TryGetValue(clientId, out var participant))
+                {
+                    var inactiveSeconds = (DateTime.UtcNow - participant.LastActivity).TotalSeconds;
+                    if (inactiveSeconds >= InactivityTimeoutSeconds)
+                    {
+                        await webSocket.CloseAsync(
+                            WebSocketCloseStatus.NormalClosure,
+                            "Inactivity timeout",
+                            CancellationToken.None);
+                        break;
+                    }
+                }
             }
         }
     }
 
-    private async Task HandleMessage(string boardId, string senderId, string message)
+    private async Task HandleMessage(BoardState board, string senderId, string message)
     {
         try
         {
-            var json = JsonNode.Parse(message);
-            var messageType = json?["type"]?.GetValue<string>();
+            using var doc = JsonDocument.Parse(message);
+            var messageType = doc.RootElement.TryGetProperty("type", out var typeEl)
+                ? typeEl.GetString()
+                : null;
 
             switch (messageType)
             {
-                case "requestSync":
-                    // Broadcast to ALL clients - each will respond with their state
-                    // Client merges all responses for resilience against partitioned clients
-                    json!["_connectionId"] = senderId;
-                    await BroadcastMessage(boardId, senderId, json.ToJsonString());
-                    break;
-
-                case "syncState":
-                    // Route only to the requesting client
-                    var targetId = json?["_targetConnectionId"]?.GetValue<string>();
-                    if (!string.IsNullOrEmpty(targetId))
+                case "ping":
+                    if (board.Participants.TryGetValue(senderId, out var sender))
                     {
-                        await SendToConnection(boardId, targetId, message);
+                        await SendJson(sender.Socket, new { type = "pong" }, CancellationToken.None);
                     }
                     break;
 
+                case "setReady":
+                    await HandleSetReady(board, senderId, doc.RootElement);
+                    break;
+
+                case "syncState":
+                    await HandleSyncState(board, message, doc.RootElement);
+                    break;
+
+                case "cardOp":
+                case "vote":
+                case "phaseChanged":
+                    // Ack the sender, then broadcast to others
+                    await AckAndBroadcast(board, senderId, doc.RootElement, message);
+                    break;
+
                 default:
-                    // Broadcast all other operations to everyone except sender
-                    await BroadcastMessage(boardId, senderId, message);
+                    // Unknown message type - ignore
                     break;
             }
         }
         catch (JsonException)
         {
-            // Invalid JSON, broadcast as-is
-            await BroadcastMessage(boardId, senderId, message);
+            // Invalid JSON - ignore
         }
     }
 
-    private async Task SendToConnection(string boardId, string connectionId, string message)
+    private async Task HandleSetReady(BoardState board, string clientId, JsonElement root)
     {
-        if (!_boards.TryGetValue(boardId, out var board))
+        if (!root.TryGetProperty("ready", out var readyEl))
             return;
 
-        if (board.TryGetValue(connectionId, out var socket) && socket.State is WebSocketState.Open)
+        var ready = readyEl.GetBoolean();
+
+        if (board.Participants.TryGetValue(clientId, out var participant))
         {
-            var messageBytes = Encoding.UTF8.GetBytes(message);
-            await socket.SendAsync(
-                messageBytes,
-                WebSocketMessageType.Text,
-                endOfMessage: true,
-                CancellationToken.None);
+            participant.IsReady = ready;
+
+            // Send ack if opId is present
+            if (root.TryGetProperty("opId", out var opIdEl))
+            {
+                var ack = new { type = "ack", opId = opIdEl.GetString() };
+                await SendJson(participant.Socket, ack, CancellationToken.None);
+            }
+
+            await BroadcastParticipantsUpdate(board, clientId);
         }
     }
 
-    private async Task BroadcastMessage(string boardId, string senderId, string message)
+    private static async Task HandleSyncState(BoardState board, string message, JsonElement root)
     {
-        if (!_boards.TryGetValue(boardId, out var board))
+        // Route to specific client if targetClientId is present
+        if (root.TryGetProperty("targetClientId", out var targetEl))
+        {
+            var targetId = targetEl.GetString();
+            if (targetId is not null && board.Participants.TryGetValue(targetId, out var target))
+            {
+                await SendRaw(target.Socket, message, CancellationToken.None);
+            }
+        }
+        else
+        {
+            // Broadcast to all (rare case after join-time merge)
+            foreach (var participant in board.Participants.Values)
+            {
+                await SendRaw(participant.Socket, message, CancellationToken.None);
+            }
+        }
+    }
+
+    private async Task AckAndBroadcast(BoardState board, string senderId, JsonElement root, string message)
+    {
+        // Send ack to sender if opId is present
+        if (root.TryGetProperty("opId", out var opIdEl) &&
+            board.Participants.TryGetValue(senderId, out var sender))
+        {
+            var ack = new { type = "ack", opId = opIdEl.GetString() };
+            await SendJson(sender.Socket, ack, CancellationToken.None);
+        }
+
+        // Broadcast to all except sender
+        await BroadcastMessage(board, senderId, message);
+    }
+
+    private static async Task SendRaw(WebSocket webSocket, string message, CancellationToken cancellationToken)
+    {
+        if (webSocket.State is not WebSocketState.Open)
             return;
 
-        var messageBytes = Encoding.UTF8.GetBytes(message);
+        var bytes = Encoding.UTF8.GetBytes(message);
+        await webSocket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
+    }
 
-        var sendTasks = board
-            .Where(kvp => kvp.Key != senderId && kvp.Value.State is WebSocketState.Open)
-            .Select(async kvp => await kvp.Value.SendAsync(
-                messageBytes,
-                WebSocketMessageType.Text,
-                endOfMessage: true,
-                CancellationToken.None));
+    private static async Task BroadcastParticipantsUpdate(BoardState board, string excludeClientId)
+    {
+        var update = new
+        {
+            type = "participantsUpdate",
+            participantCount = board.Participants.Count,
+            readyCount = board.Participants.Values.Count(p => p.IsReady)
+        };
 
-        await Task.WhenAll(sendTasks);
+        var json = JsonSerializer.Serialize(update);
+        var bytes = Encoding.UTF8.GetBytes(json);
+
+        var tasks = board.Participants
+            .Where(kvp => kvp.Key != excludeClientId && kvp.Value.Socket.State is WebSocketState.Open)
+            .Select(kvp => SendRaw(kvp.Value.Socket, Encoding.UTF8.GetString(bytes), CancellationToken.None));
+
+        await Task.WhenAll(tasks);
+    }
+
+    private static async Task BroadcastMessage(BoardState board, string excludeClientId, string message)
+    {
+        var tasks = board.Participants
+            .Where(kvp => kvp.Key != excludeClientId && kvp.Value.Socket.State is WebSocketState.Open)
+            .Select(kvp => SendRaw(kvp.Value.Socket, message, CancellationToken.None));
+
+        await Task.WhenAll(tasks);
+    }
+
+    private sealed class BoardState
+    {
+        public ConcurrentDictionary<string, ParticipantState> Participants { get; } = [];
+    }
+
+    private sealed class ParticipantState(WebSocket socket)
+    {
+        public WebSocket Socket { get; } = socket;
+        public bool IsReady { get; set; }
+        public DateTime LastActivity { get; set; } = DateTime.UtcNow;
     }
 }

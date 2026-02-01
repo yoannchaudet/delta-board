@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -48,22 +50,68 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task WebSocket_AcceptsConnection()
+    public async Task WebSocket_AcceptsConnectionAndHandshake()
     {
         // Arrange
-        var client = _factory.CreateClient();
         var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"accept-test-{Guid.NewGuid():N}";
 
         // Act
         var ws = await wsClient.ConnectAsync(
-            new Uri(_factory.Server.BaseAddress, "/board/test-board/ws"),
+            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
             CancellationToken.None);
 
-        // Assert
         Assert.Equal(WebSocketState.Open, ws.State);
+
+        // Send hello
+        await SendJson(ws, new { type = "hello", clientId = "test-client-1" });
+
+        // Receive welcome
+        var welcome = await ReceiveJson(ws);
+
+        // Assert
+        Assert.Equal("welcome", welcome.GetProperty("type").GetString());
+        Assert.Equal(1, welcome.GetProperty("participantCount").GetInt32());
+        Assert.Equal(0, welcome.GetProperty("readyCount").GetInt32());
 
         // Cleanup
         await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task WebSocket_RejectsDuplicateClientId()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"dup-test-{Guid.NewGuid():N}";
+        var clientId = "duplicate-client";
+
+        // Connect first client
+        var ws1 = await wsClient.ConnectAsync(
+            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
+            CancellationToken.None);
+        await SendJson(ws1, new { type = "hello", clientId });
+        var welcome1 = await ReceiveJson(ws1);
+        Assert.Equal("welcome", welcome1.GetProperty("type").GetString());
+
+        // Connect second client with same clientId
+        var ws2 = await wsClient.ConnectAsync(
+            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
+            CancellationToken.None);
+        await SendJson(ws2, new { type = "hello", clientId });
+
+        // Should receive error
+        var response = await ReceiveJson(ws2);
+        Assert.Equal("error", response.GetProperty("type").GetString());
+        Assert.Contains("already connected", response.GetProperty("message").GetString());
+
+        // Connection should be closed
+        var buffer = new byte[1024];
+        var result = await ws2.ReceiveAsync(buffer, CancellationToken.None);
+        Assert.Equal(WebSocketMessageType.Close, result.MessageType);
+
+        // Cleanup
+        await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
     }
 
     [Fact]
@@ -76,30 +124,31 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 
         try
         {
-            // Act - Connect 20 clients (should all succeed)
+            // Act - Connect 20 clients with handshake
             for (int i = 0; i < 20; i++)
             {
                 var ws = await wsClient.ConnectAsync(
                     new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
                     CancellationToken.None);
-                Assert.Equal(WebSocketState.Open, ws.State);
+                await SendJson(ws, new { type = "hello", clientId = $"client-{i}" });
+                var welcome = await ReceiveJson(ws);
+                Assert.Equal("welcome", welcome.GetProperty("type").GetString());
                 connections.Add(ws);
             }
 
-            // Act - Try to connect 21st client (should be rejected)
+            // Act - Try to connect 21st client (should be rejected before handshake)
             var extraWs = await wsClient.ConnectAsync(
                 new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
                 CancellationToken.None);
 
-            // The server closes the connection with PolicyViolation
-            // We need to receive to see the close status
+            // Should receive error immediately (board full)
+            var response = await ReceiveJson(extraWs);
+            Assert.Equal("error", response.GetProperty("type").GetString());
+
+            // The server closes the connection
             var buffer = new byte[1024];
             var result = await extraWs.ReceiveAsync(buffer, CancellationToken.None);
-
-            // Assert
             Assert.Equal(WebSocketMessageType.Close, result.MessageType);
-            Assert.Equal(WebSocketCloseStatus.PolicyViolation, extraWs.CloseStatus);
-            Assert.Contains("max 20", extraWs.CloseStatusDescription);
         }
         finally
         {
@@ -115,39 +164,123 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task WebSocket_BroadcastsMessages()
+    public async Task WebSocket_BroadcastsCardOp()
     {
         // Arrange
         var wsClient = _factory.Server.CreateWebSocketClient();
         var boardId = $"broadcast-test-{Guid.NewGuid():N}";
 
-        var ws1 = await wsClient.ConnectAsync(
-            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
-            CancellationToken.None);
-        var ws2 = await wsClient.ConnectAsync(
-            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
-            CancellationToken.None);
+        var ws1 = await ConnectAndHandshake(wsClient, boardId, "client-1");
+        var ws2 = await ConnectAndHandshake(wsClient, boardId, "client-2");
+
+        // ws1 should receive participantsUpdate when ws2 joins
+        var update = await ReceiveJson(ws1);
+        Assert.Equal("participantsUpdate", update.GetProperty("type").GetString());
+        Assert.Equal(2, update.GetProperty("participantCount").GetInt32());
 
         try
         {
-            // Act - Send message from ws1
-            var message = """{"type":"createCard","card":{"id":"test-card","text":"Hello"}}""";
-            var sendBuffer = System.Text.Encoding.UTF8.GetBytes(message);
-            await ws1.SendAsync(sendBuffer, WebSocketMessageType.Text, true, CancellationToken.None);
+            // Act - Send cardOp from ws1
+            await SendJson(ws1, new
+            {
+                type = "cardOp",
+                opId = "op-1",
+                cardId = "card-1",
+                column = "well",
+                text = "Test card",
+                authorId = "client-1",
+                rev = 1
+            });
 
-            // Assert - ws2 should receive the message
-            var receiveBuffer = new byte[1024];
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var result = await ws2.ReceiveAsync(receiveBuffer, cts.Token);
+            // ws1 should receive ack
+            var ack = await ReceiveJson(ws1);
+            Assert.Equal("ack", ack.GetProperty("type").GetString());
+            Assert.Equal("op-1", ack.GetProperty("opId").GetString());
 
-            Assert.Equal(WebSocketMessageType.Text, result.MessageType);
-            var received = System.Text.Encoding.UTF8.GetString(receiveBuffer, 0, result.Count);
-            Assert.Contains("createCard", received);
-            Assert.Contains("test-card", received);
+            // ws2 should receive the cardOp
+            var received = await ReceiveJson(ws2);
+            Assert.Equal("cardOp", received.GetProperty("type").GetString());
+            Assert.Equal("card-1", received.GetProperty("cardId").GetString());
         }
         finally
         {
-            // Cleanup
+            await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+            await ws2.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task WebSocket_BroadcastsVote()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"vote-test-{Guid.NewGuid():N}";
+
+        var ws1 = await ConnectAndHandshake(wsClient, boardId, "client-1");
+        var ws2 = await ConnectAndHandshake(wsClient, boardId, "client-2");
+
+        // Consume participantsUpdate on ws1
+        await ReceiveJson(ws1);
+
+        try
+        {
+            // Act - Send vote from ws1
+            await SendJson(ws1, new
+            {
+                type = "vote",
+                opId = "vote-op-1",
+                cardId = "card-1",
+                voterId = "client-1",
+                rev = 1,
+                isDeleted = false
+            });
+
+            // ws1 should receive ack
+            var ack = await ReceiveJson(ws1);
+            Assert.Equal("ack", ack.GetProperty("type").GetString());
+
+            // ws2 should receive the vote
+            var received = await ReceiveJson(ws2);
+            Assert.Equal("vote", received.GetProperty("type").GetString());
+            Assert.Equal("card-1", received.GetProperty("cardId").GetString());
+        }
+        finally
+        {
+            await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+            await ws2.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task WebSocket_SetReadyUpdatesParticipants()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"ready-test-{Guid.NewGuid():N}";
+
+        var ws1 = await ConnectAndHandshake(wsClient, boardId, "client-1");
+        var ws2 = await ConnectAndHandshake(wsClient, boardId, "client-2");
+
+        // Consume participantsUpdate on ws1 from ws2 joining
+        await ReceiveJson(ws1);
+
+        try
+        {
+            // Act - ws1 sets ready
+            await SendJson(ws1, new { type = "setReady", opId = "ready-op-1", ready = true });
+
+            // ws1 should receive ack
+            var ack = await ReceiveJson(ws1);
+            Assert.Equal("ack", ack.GetProperty("type").GetString());
+
+            // ws2 should receive participantsUpdate with readyCount = 1
+            var update = await ReceiveJson(ws2);
+            Assert.Equal("participantsUpdate", update.GetProperty("type").GetString());
+            Assert.Equal(2, update.GetProperty("participantCount").GetInt32());
+            Assert.Equal(1, update.GetProperty("readyCount").GetInt32());
+        }
+        finally
+        {
             await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
             await ws2.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
         }
@@ -160,37 +293,93 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         var wsClient = _factory.Server.CreateWebSocketClient();
         var boardId = $"sync-test-{Guid.NewGuid():N}";
 
-        var ws1 = await wsClient.ConnectAsync(
-            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
-            CancellationToken.None);
-        var ws2 = await wsClient.ConnectAsync(
-            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
-            CancellationToken.None);
+        var ws1 = await ConnectAndHandshake(wsClient, boardId, "client-1");
+        var ws2 = await ConnectAndHandshake(wsClient, boardId, "client-2");
+        var ws3 = await ConnectAndHandshake(wsClient, boardId, "client-3");
+
+        // Consume participantsUpdates
+        await ReceiveJson(ws1); // ws2 joined
+        await ReceiveJson(ws1); // ws3 joined
+        await ReceiveJson(ws2); // ws3 joined
 
         try
         {
-            // Act - ws1 sends requestSync, which should be broadcast with connection ID
-            var requestSync = """{"type":"requestSync"}""";
-            await ws1.SendAsync(
-                System.Text.Encoding.UTF8.GetBytes(requestSync),
-                WebSocketMessageType.Text,
-                true,
-                CancellationToken.None);
+            // Act - ws1 sends syncState targeted at client-2
+            await SendJson(ws1, new
+            {
+                type = "syncState",
+                targetClientId = "client-2",
+                state = new { phase = "forming", cards = Array.Empty<object>(), votes = Array.Empty<object>() }
+            });
 
-            // ws2 receives the requestSync with _connectionId
-            var buffer = new byte[1024];
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var result = await ws2.ReceiveAsync(buffer, cts.Token);
+            // ws2 should receive the syncState
+            var received = await ReceiveJson(ws2);
+            Assert.Equal("syncState", received.GetProperty("type").GetString());
 
-            var received = System.Text.Encoding.UTF8.GetString(buffer, 0, result.Count);
-            Assert.Contains("requestSync", received);
-            Assert.Contains("_connectionId", received);
+            // ws3 should NOT receive it - verify by expecting timeout
+            var didTimeout = false;
+            try
+            {
+                await ReceiveJsonWithTimeout(ws3, TimeSpan.FromMilliseconds(500));
+            }
+            catch (OperationCanceledException)
+            {
+                didTimeout = true;
+            }
+            Assert.True(didTimeout, "ws3 should not have received the syncState message");
         }
         finally
         {
             await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
             await ws2.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+            await ws3.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
         }
+    }
+
+    [Fact]
+    public async Task WebSocket_PingPong()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"ping-test-{Guid.NewGuid():N}";
+
+        var ws = await ConnectAndHandshake(wsClient, boardId, "client-1");
+
+        try
+        {
+            // Act - Send ping
+            await SendJson(ws, new { type = "ping" });
+
+            // Should receive pong
+            var pong = await ReceiveJson(ws);
+            Assert.Equal("pong", pong.GetProperty("type").GetString());
+        }
+        finally
+        {
+            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task WebSocket_HelloTimeout()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"timeout-test-{Guid.NewGuid():N}";
+
+        // Act - Connect but don't send hello
+        var ws = await wsClient.ConnectAsync(
+            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
+            CancellationToken.None);
+
+        // Wait for timeout (5 seconds + buffer)
+        var buffer = new byte[1024];
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(7));
+        var result = await ws.ReceiveAsync(buffer, cts.Token);
+
+        // Assert - Connection should be closed due to timeout
+        Assert.Equal(WebSocketMessageType.Close, result.MessageType);
+        Assert.Equal(WebSocketCloseStatus.ProtocolError, ws.CloseStatus);
     }
 
     [Fact]
@@ -204,5 +393,52 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 
         // Assert
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // Helper methods
+
+    private async Task<WebSocket> ConnectAndHandshake(Microsoft.AspNetCore.TestHost.WebSocketClient wsClient, string boardId, string clientId)
+    {
+        var ws = await wsClient.ConnectAsync(
+            new Uri(_factory.Server.BaseAddress, $"/board/{boardId}/ws"),
+            CancellationToken.None);
+
+        await SendJson(ws, new { type = "hello", clientId });
+        var welcome = await ReceiveJson(ws);
+        Assert.Equal("welcome", welcome.GetProperty("type").GetString());
+
+        return ws;
+    }
+
+    private static async Task SendJson(WebSocket ws, object payload)
+    {
+        var json = JsonSerializer.Serialize(payload);
+        var bytes = Encoding.UTF8.GetBytes(json);
+        await ws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
+    }
+
+    private static async Task<JsonElement> ReceiveJson(WebSocket ws)
+    {
+        var buffer = new byte[4096];
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var result = await ws.ReceiveAsync(buffer, cts.Token);
+
+        if (result.MessageType == WebSocketMessageType.Close)
+        {
+            throw new InvalidOperationException($"WebSocket closed: {ws.CloseStatus} - {ws.CloseStatusDescription}");
+        }
+
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        return JsonDocument.Parse(json).RootElement;
+    }
+
+    private static async Task<JsonElement> ReceiveJsonWithTimeout(WebSocket ws, TimeSpan timeout)
+    {
+        var buffer = new byte[4096];
+        using var cts = new CancellationTokenSource(timeout);
+        var result = await ws.ReceiveAsync(buffer, cts.Token);
+
+        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        return JsonDocument.Parse(json).RootElement;
     }
 }
