@@ -490,6 +490,18 @@ Clients must validate outgoing and incoming operations:
 Each client generates and persists a `clientId`.
 Opening the board in a new browser or private window creates a new participant identity.
 
+### Duplicate Connection Prevention
+
+A single `clientId` should have at most one active connection per board. Multiple tabs with the same identity cause revision conflicts and unpredictable state.
+
+Clients SHOULD use the [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) to enforce single-tab access:
+
+1. Before connecting, request an exclusive lock scoped to the board (e.g., `delta-board-{boardId}`)
+2. If the lock is unavailable, display an error and do not connect
+3. Hold the lock for the session lifetime; it auto-releases when the tab closes
+
+The server MAY also reject a `hello` from a `clientId` that is already connected to the same board, responding with an [error](#schema-error) message. This provides a fallback if the client-side check is bypassed or unsupported.
+
 ## Connection Health and Heartbeats
 
 Clients send [ping](#schema-ping) every 10 seconds.
