@@ -77,10 +77,9 @@ export function createConnection(boardId, callbacks = {}) {
             socket.onopen = () => {
                 setState('handshaking');
                 // Send hello
-                socket.send(JSON.stringify({
-                    type: 'hello',
-                    clientId
-                }));
+                const hello = { type: 'hello', clientId };
+                console.debug('[WS TX]', JSON.stringify(hello));
+                socket.send(JSON.stringify(hello));
             };
 
             socket.onmessage = (event) => {
@@ -88,6 +87,7 @@ export function createConnection(boardId, callbacks = {}) {
             };
 
             socket.onclose = (event) => {
+                console.debug('[WS CLOSE]', event.code, event.reason);
                 cleanup();
 
                 if (event.code === 1008 || event.code === 4000) {
@@ -111,6 +111,7 @@ export function createConnection(boardId, callbacks = {}) {
 
     function handleMessage(data) {
         try {
+            console.debug('[WS RX]', data);
             const message = JSON.parse(data);
 
             switch (message.type) {
@@ -161,7 +162,9 @@ export function createConnection(boardId, callbacks = {}) {
         pingInterval = setInterval(() => {
             if (socket?.readyState === WebSocket.OPEN) {
                 schedulePongTimeout();
-                socket.send(JSON.stringify({ type: 'ping' }));
+                const ping = JSON.stringify({ type: 'ping' });
+                console.debug('[WS TX]', ping);
+                socket.send(ping);
             }
         }, PING_INTERVAL_MS);
     }
@@ -222,7 +225,9 @@ export function createConnection(boardId, callbacks = {}) {
 
     function send(message) {
         if (socket?.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify(message));
+            const json = JSON.stringify(message);
+            console.debug('[WS TX]', json);
+            socket.send(json);
             return true;
         }
         return false;

@@ -67,6 +67,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `type` (string, required)
 - `participantsCount` (number, required)
 - `readyCount` (number, required)
+- `welcome` provides the new client with the current counts; the server does **not** send a `participantsUpdate` back to the joining client.
 
 <a id="schema-participantsupdate"></a>
 
@@ -89,6 +90,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `participantsCount` (number, required)
 - `readyCount` (number, required)
 - `syncForClientId` (string, optional; when present, indicates who needs a [syncState](#schema-syncstate))
+- On join/leave, the server broadcasts `participantsUpdate` to **all other** connected clients (not the initiator).
 
 <a id="schema-setready"></a>
 

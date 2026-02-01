@@ -66,7 +66,7 @@ The server currently tracks connections but not client identity. Add:
 - [x] Parse `hello` message to extract `clientId`
 - [x] Reject duplicate `clientId` per board (send `error`, close connection)
 - [x] Send `welcome` with `participantCount` and `readyCount` (initially 0)
-- [x] Broadcast `participantsUpdate` on join/leave
+- [x] Broadcast `participantsUpdate` on join/leave to all other clients (initiator relies on `welcome`)
 - [x] Track readiness state per client: `boardId → clientId → isReady`
 
 ### 1.3 Client Connection Handshake

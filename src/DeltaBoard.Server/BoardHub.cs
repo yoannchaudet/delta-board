@@ -7,6 +7,13 @@ namespace DeltaBoard.Server;
 
 public sealed class BoardHub
 {
+    private readonly ILogger<BoardHub> _logger;
+
+    public BoardHub(ILogger<BoardHub> logger)
+    {
+        _logger = logger;
+    }
+
     private const int MaxParticipantsPerBoard = 20;
     private const int BufferSize = 64 * 1024; // 64KB for sync payloads
     private const int HelloTimeoutSeconds = 5;
@@ -19,11 +26,13 @@ public sealed class BoardHub
     public async Task HandleConnection(string boardId, WebSocket webSocket, CancellationToken cancellationToken)
     {
         var board = _boards.GetOrAdd(boardId, _ => new BoardState());
+        var connectionId = Guid.NewGuid().ToString("N");
+        _logger.LogInformation("WS connect {ConnectionId} board={BoardId}", connectionId, boardId);
 
         // Check capacity before handshake
         if (board.Participants.Count >= MaxParticipantsPerBoard)
         {
-            await SendError(webSocket, "Board is full (max 20 participants)", cancellationToken);
+            await SendError(webSocket, "Board is full (max 20 participants)", "unknown", cancellationToken);
             await webSocket.CloseAsync(
                 WebSocketCloseStatus.PolicyViolation,
                 "Board is full",
@@ -35,13 +44,15 @@ public sealed class BoardHub
         var clientId = await WaitForHello(webSocket, cancellationToken);
         if (clientId is null)
         {
+            _logger.LogWarning("WS {ConnectionId} board={BoardId} no hello; closing", connectionId, boardId);
             return; // Connection closed or invalid hello
         }
 
         // Check for duplicate clientId
         if (!board.Participants.TryAdd(clientId, new ParticipantState(webSocket)))
         {
-            await SendError(webSocket, "Client ID already connected to this board", cancellationToken);
+            _logger.LogWarning("WS {ConnectionId} board={BoardId} duplicate clientId={ClientId}", connectionId, boardId, clientId);
+            await SendError(webSocket, "Client ID already connected to this board", clientId, cancellationToken);
             await webSocket.CloseAsync(
                 WebSocketCloseStatus.PolicyViolation,
                 "Duplicate client ID",
@@ -52,10 +63,11 @@ public sealed class BoardHub
         try
         {
             // Send welcome
-            await SendWelcome(webSocket, board, cancellationToken);
+            await SendWelcome(webSocket, board, clientId, cancellationToken);
+            _logger.LogInformation("WS {ConnectionId} board={BoardId} client={ClientId} welcome sent", connectionId, boardId, clientId);
 
-            // Notify existing participants
-            await BroadcastParticipantsUpdate(board, null);
+            // Notify existing participants (exclude the joiner; they already got welcome)
+            await BroadcastParticipantsUpdate(board, clientId);
 
             // Main message loop
             await ReceiveMessages(board, clientId, webSocket, cancellationToken);
@@ -63,11 +75,23 @@ public sealed class BoardHub
         catch (OperationCanceledException)
         {
             // Server shutting down or request aborted
+            _logger.LogInformation("WS {ConnectionId} board={BoardId} client={ClientId} canceled", connectionId, boardId, clientId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "WS {ConnectionId} board={BoardId} client={ClientId} exception", connectionId, boardId, clientId);
+            throw;
         }
         finally
         {
             board.Participants.TryRemove(clientId, out _);
             await BroadcastParticipantsUpdate(board, clientId);
+            _logger.LogInformation("WS {ConnectionId} board={BoardId} client={ClientId} closed state={State} closeStatus={CloseStatus}",
+                connectionId,
+                boardId,
+                clientId,
+                webSocket.State,
+                webSocket.CloseStatus);
 
             if (board.Participants.IsEmpty)
             {
@@ -76,7 +100,7 @@ public sealed class BoardHub
         }
     }
 
-    private static async Task<string?> WaitForHello(WebSocket webSocket, CancellationToken cancellationToken)
+    private async Task<string?> WaitForHello(WebSocket webSocket, CancellationToken cancellationToken)
     {
         try
         {
@@ -92,6 +116,7 @@ public sealed class BoardHub
 
             if (messageType is WebSocketMessageType.Text && message is not null)
             {
+                LogProtocol("RX", "unknown", message);
                 using var doc = JsonDocument.Parse(message);
 
                 if (doc.RootElement.TryGetProperty("type", out var typeEl) &&
@@ -104,7 +129,7 @@ public sealed class BoardHub
         }
         catch (JsonException)
         {
-            // Invalid JSON - fall through to close
+            _logger.LogWarning("WS RX invalid hello JSON");
         }
         catch (OperationCanceledException)
         {
@@ -121,7 +146,7 @@ public sealed class BoardHub
         return null;
     }
 
-    private static async Task SendWelcome(WebSocket webSocket, BoardState board, CancellationToken cancellationToken)
+    private async Task SendWelcome(WebSocket webSocket, BoardState board, string clientId, CancellationToken cancellationToken)
     {
         var welcome = new
         {
@@ -130,22 +155,23 @@ public sealed class BoardHub
             readyCount = board.Participants.Values.Count(p => p.IsReady)
         };
 
-        await SendJson(webSocket, welcome, cancellationToken);
+        await SendJson(webSocket, welcome, clientId, cancellationToken);
     }
 
-    private static async Task SendError(WebSocket webSocket, string message, CancellationToken cancellationToken)
+    private async Task SendError(WebSocket webSocket, string message, string clientId, CancellationToken cancellationToken)
     {
         var error = new { type = "error", message };
-        await SendJson(webSocket, error, cancellationToken);
+        await SendJson(webSocket, error, clientId, cancellationToken);
     }
 
-    private static async Task SendJson(WebSocket webSocket, object payload, CancellationToken cancellationToken)
+    private async Task SendJson(WebSocket webSocket, object payload, string clientId, CancellationToken cancellationToken)
     {
         if (webSocket.State is not WebSocketState.Open)
             return;
 
         var json = JsonSerializer.Serialize(payload);
         var bytes = Encoding.UTF8.GetBytes(json);
+        LogProtocol("TX", clientId, json);
         await webSocket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
     }
 
@@ -170,6 +196,7 @@ public sealed class BoardHub
 
                 if (messageType is WebSocketMessageType.Close)
                 {
+                    _logger.LogInformation("WS message close client={ClientId} status={CloseStatus}", clientId, webSocket.CloseStatus);
                     await webSocket.CloseAsync(
                         WebSocketCloseStatus.NormalClosure,
                         "Closing",
@@ -179,6 +206,7 @@ public sealed class BoardHub
 
                 if (messageType is WebSocketMessageType.Text && message is not null)
                 {
+                    LogProtocol("RX", clientId, message);
                     await HandleMessage(board, clientId, message);
                 }
             }
@@ -190,6 +218,7 @@ public sealed class BoardHub
                     var inactiveSeconds = (DateTime.UtcNow - participant.LastActivity).TotalSeconds;
                     if (inactiveSeconds >= InactivityTimeoutSeconds)
                     {
+                        _logger.LogWarning("WS inactivity timeout client={ClientId} inactiveSeconds={InactiveSeconds}", clientId, inactiveSeconds);
                         await webSocket.CloseAsync(
                             WebSocketCloseStatus.NormalClosure,
                             "Inactivity timeout",
@@ -247,7 +276,7 @@ public sealed class BoardHub
                 case "ping":
                     if (board.Participants.TryGetValue(senderId, out var sender))
                     {
-                        await SendJson(sender.Socket, new { type = "pong" }, CancellationToken.None);
+                        await SendJson(sender.Socket, new { type = "pong" }, senderId, CancellationToken.None);
                     }
                     break;
 
@@ -273,7 +302,7 @@ public sealed class BoardHub
         }
         catch (JsonException)
         {
-            // Invalid JSON - ignore
+            _logger.LogWarning("WS RX invalid JSON client={ClientId}", senderId);
         }
     }
 
@@ -292,14 +321,14 @@ public sealed class BoardHub
             if (root.TryGetProperty("opId", out var opIdEl))
             {
                 var ack = new { type = "ack", opId = opIdEl.GetString() };
-                await SendJson(participant.Socket, ack, CancellationToken.None);
+                await SendJson(participant.Socket, ack, clientId, CancellationToken.None);
             }
 
             await BroadcastParticipantsUpdate(board, clientId);
         }
     }
 
-    private static async Task HandleSyncState(BoardState board, string message, JsonElement root)
+    private async Task HandleSyncState(BoardState board, string message, JsonElement root)
     {
         // Route to specific client if targetClientId is present
         if (root.TryGetProperty("targetClientId", out var targetEl))
@@ -307,15 +336,15 @@ public sealed class BoardHub
             var targetId = targetEl.GetString();
             if (targetId is not null && board.Participants.TryGetValue(targetId, out var target))
             {
-                await SendRaw(target.Socket, message, CancellationToken.None);
+                await SendRaw(target.Socket, message, targetId, CancellationToken.None);
             }
         }
         else
         {
             // Broadcast to all (rare case after join-time merge)
-            foreach (var participant in board.Participants.Values)
+            foreach (var kvp in board.Participants)
             {
-                await SendRaw(participant.Socket, message, CancellationToken.None);
+                await SendRaw(kvp.Value.Socket, message, kvp.Key, CancellationToken.None);
             }
         }
     }
@@ -327,23 +356,24 @@ public sealed class BoardHub
             board.Participants.TryGetValue(senderId, out var sender))
         {
             var ack = new { type = "ack", opId = opIdEl.GetString() };
-            await SendJson(sender.Socket, ack, CancellationToken.None);
+            await SendJson(sender.Socket, ack, senderId, CancellationToken.None);
         }
 
         // Broadcast to all except sender
         await BroadcastMessage(board, senderId, message);
     }
 
-    private static async Task SendRaw(WebSocket webSocket, string message, CancellationToken cancellationToken)
+    private async Task SendRaw(WebSocket webSocket, string message, string clientId, CancellationToken cancellationToken)
     {
         if (webSocket.State is not WebSocketState.Open)
             return;
 
         var bytes = Encoding.UTF8.GetBytes(message);
+        LogProtocol("TX", clientId, message);
         await webSocket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
     }
 
-    private static async Task BroadcastParticipantsUpdate(BoardState board, string? excludeClientId)
+    private async Task BroadcastParticipantsUpdate(BoardState board, string? excludeClientId)
     {
         var update = new
         {
@@ -353,21 +383,20 @@ public sealed class BoardHub
         };
 
         var json = JsonSerializer.Serialize(update);
-        var bytes = Encoding.UTF8.GetBytes(json);
 
         var tasks = board.Participants
             .Where(kvp => excludeClientId is null || kvp.Key != excludeClientId)
             .Where(kvp => kvp.Value.Socket.State is WebSocketState.Open)
-            .Select(kvp => SendRaw(kvp.Value.Socket, Encoding.UTF8.GetString(bytes), CancellationToken.None));
+            .Select(kvp => SendRaw(kvp.Value.Socket, json, kvp.Key, CancellationToken.None));
 
         await Task.WhenAll(tasks);
     }
 
-    private static async Task BroadcastMessage(BoardState board, string excludeClientId, string message)
+    private async Task BroadcastMessage(BoardState board, string excludeClientId, string message)
     {
         var tasks = board.Participants
             .Where(kvp => kvp.Key != excludeClientId && kvp.Value.Socket.State is WebSocketState.Open)
-            .Select(kvp => SendRaw(kvp.Value.Socket, message, CancellationToken.None));
+            .Select(kvp => SendRaw(kvp.Value.Socket, message, kvp.Key, CancellationToken.None));
 
         await Task.WhenAll(tasks);
     }
@@ -382,5 +411,32 @@ public sealed class BoardHub
         public WebSocket Socket { get; } = socket;
         public bool IsReady { get; set; }
         public DateTime LastActivity { get; set; } = DateTime.UtcNow;
+    }
+
+    private void LogProtocol(string direction, string clientId, string payload)
+    {
+        if (!_logger.IsEnabled(LogLevel.Information))
+            return;
+
+        var type = "unknown";
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            if (doc.RootElement.TryGetProperty("type", out var typeEl))
+            {
+                type = typeEl.GetString() ?? "unknown";
+            }
+        }
+        catch (JsonException)
+        {
+            type = "invalid-json";
+        }
+
+        _logger.LogInformation("WS {Direction} client={ClientId} type={Type} bytes={Size} payload={Payload}",
+            direction,
+            clientId,
+            type,
+            Encoding.UTF8.GetByteCount(payload),
+            payload);
     }
 }
