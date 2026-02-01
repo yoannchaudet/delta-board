@@ -1,33 +1,57 @@
 # Communication Protocol
 
-Delta Board uses WebSockets for real time collaboration between clients. The server acts primarily as a message broker and keeps only minimal in memory session state required for presence and phase transitions. No board data is persisted on the server.
+Delta Board uses WebSockets for real-time collaboration between clients. The server acts primarily as a message broker and keeps only minimal in-memory session state required for presence. No board data is persisted on the server.
 
 ## Message Types
 
 | Type                 | Direction                     | Description                                              |
 | -------------------- | ----------------------------- | -------------------------------------------------------- |
 | `hello`              | Client → Server               | Initial handshake, includes clientId                     |
-| `welcome`            | Server → Client               | Returns phase, participant counts, then initiates sync   |
+| `welcome`            | Server → Client               | Returns participant counts, then initiates sync          |
 | `participantsUpdate` | Server → Clients              | Broadcast when presence or readiness changes             |
 | `setReady`           | Client → Server               | Participant updates readiness state                      |
-| `requestPhaseChange` | Client → Server               | Request transition to reviewing                          |
-| `phaseChanged`       | Server → Clients              | Authoritative phase transition event                     |
+| `phaseChanged`       | Client → Clients (via Server) | Broadcast phase transition to reviewing                  |
 | `syncState`          | Client → Client (via Server)  | Send full board state to a new client                    |
 | `cardOp`             | Client → Clients (via Server) | Card operation (create, edit, or delete)                 |
 | `vote`               | Client → Clients (via Server) | Vote operation (add or remove)                           |
+| `ack`                | Server → Client               | Acknowledges receipt of an operation                     |
+| `error`              | Server → Client               | Indicates an operation was rejected                      |
 | `ping`               | Client → Server               | Heartbeat to indicate client is alive                    |
 | `pong`               | Server → Client               | Acknowledges heartbeat                                   |
-| `error`              | Server → Client               | Indicates an operation was rejected                      |
 
 ## Server Authority
 
 The server is authoritative for:
 
-- Current board phase
 - Connected participant count
 - Readiness state per participant
 
-Clients must treat `phaseChanged` and `participantsUpdate` events from the server as the source of truth, even if their local state differs.
+The server does not track:
+
+- Board phase (managed by clients via replicated state)
+- Cards or votes (managed by clients)
+
+Clients must treat `participantsUpdate` events from the server as the source of truth for presence and readiness.
+
+## Reliable Operation Delivery
+
+All state-changing client operations (`cardOp`, `vote`, `setReady`, `phaseChanged`) must include a unique `opId`.
+
+The server acknowledges receipt:
+
+```json
+{ "type": "ack", "opId": "uuid" }
+```
+
+If the client does not receive an `ack` within a short timeout, it must retry sending the same operation with the same `opId`.
+
+If an operation is invalid, the server responds:
+
+```json
+{ "type": "error", "opId": "uuid", "reason": "invalidPhase" }
+```
+
+This provides at-least-once delivery with idempotent convergence.
 
 ## Connection Flow
 
@@ -40,116 +64,19 @@ sequenceDiagram
 
     C->>S: Connect to /ws/{boardId}
     C->>S: hello { clientId }
-    S->>C: welcome { phase, participantsCount, readyCount }
+    S->>C: welcome { participantsCount, readyCount }
 
-    S->>A: participantsUpdate
-    S->>B: participantsUpdate
+    S->>A: participantsUpdate { syncForClientId: C }
+    S->>B: participantsUpdate { syncForClientId: C }
 
-    Note over S: Server requests sync on behalf of C
-    S->>A: syncRequest (target C)
-    S->>B: syncRequest (target C)
     A->>S: syncState (to C)
     B->>S: syncState (to C)
     S->>C: syncState from A and B
-    Note over C: Merges all received states
 ```
-
-## Presence and Readiness
-
-The server maintains an in-memory list of connected participants per board based on active WebSocket connections.
-
-The `participantsUpdate` message combines both presence and readiness information:
-
-```json
-{
-  "type": "participantsUpdate",
-  "participantsCount": 5,
-  "readyCount": 3
-}
-```
-
-This message is broadcast when:
-- A participant connects or disconnects
-- A participant changes their readiness state
-
-When a participant disconnects, their readiness state is automatically removed.
-
-Quorum is always calculated based on currently connected participants. When participants leave, quorum may be reached automatically and the server may allow or trigger a phase transition.
-
-```mermaid
-sequenceDiagram
-    participant A as Client A
-    participant S as Server
-    participant B as Client B
-
-    A->>S: setReady { ready: true }
-    S->>S: Update readiness set
-    S->>A: participantsUpdate { participantsCount: 2, readyCount: 1 }
-    S->>B: participantsUpdate { participantsCount: 2, readyCount: 1 }
-```
-
-The server is authoritative for participant and readiness counts, and determines when quorum is reached.
-
-## Phase Transition Flow
-
-```mermaid
-sequenceDiagram
-    participant A as Client A
-    participant S as Server
-    participant B as Client B
-
-    A->>S: requestPhaseChange
-    S->>S: Check quorum
-    S->>A: phaseChanged { phase: reviewing }
-    S->>B: phaseChanged { phase: reviewing }
-```
-
-Rules:
-
-- The server decides whether quorum is met
-- Once `phaseChanged` is broadcast, the board is permanently in reviewing phase
-- Clients must lock editing and voting after receiving this event
-
-## Phase Enforcement
-
-All client operations (`cardOp`, `vote`) must include the sender’s current understanding of the board phase.
-
-The server validates operations against its authoritative phase:
-
-- During `forming`, card edits and votes are allowed
-- During `reviewing`, card edits and vote changes are rejected
-
-If an operation’s phase does not match the server’s phase, it must be rejected.
-
-If an operation is rejected due to phase mismatch or invalid state, the server should send an `error` message back to the sender describing the reason. The operation must not be broadcast.
 
 ## Operation Broadcast Flow
 
-Card and vote operations use a unified format with an `action` field and unique operation ID:
-
-```json
-{
-  "type": "cardOp",
-  "opId": "uuid",
-  "phase": "forming",
-  "action": "create" | "edit" | "delete",
-  "cardId": "...",
-  "column": "well" | "delta",
-  "text": "...",
-  "authorId": "..."
-}
-```
-
-```json
-{
-  "type": "vote",
-  "opId": "uuid",
-  "phase": "forming",
-  "action": "add" | "remove",
-  "cardId": "...",
-  "voterId": "..."
-}
-```
+All operations are idempotent and include an `opId`.
 
 ```mermaid
 sequenceDiagram
@@ -158,54 +85,94 @@ sequenceDiagram
     participant B as Client B
     participant C as Client C
 
-    A->>S: cardOp { action: create, ... }
-    S->>B: cardOp { action: create, ... }
-    S->>C: cardOp { action: create, ... }
-    Note over B,C: Each client applies operation locally
+    A->>S: cardOp { opId }
+    S->>A: ack { opId }
+    S->>B: cardOp
+    S->>C: cardOp
 ```
 
-All operations are idempotent. Clients must ignore duplicates based on `opId` to ensure consistent convergence across replicas.
+Clients must ignore duplicate operations based on `opId`.
+
+## Card Revision Model
+
+Each card has a monotonically increasing `rev` managed by the card author.
+
+```json
+{
+  "type": "cardOp",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "edit",
+  "cardId": "...",
+  "rev": 3,
+  "text": "Updated text"
+}
+```
+
+Clients apply a card edit only if the incoming `rev` is greater than the stored revision.
+This prevents older edits from overwriting newer ones.
+
+Deletes are also versioned operations and must carry a higher `rev`.
+
+## Vote Model
+
+Votes converge by union. Each vote operation contains an `opId` and is idempotent.
+
+```json
+{
+  "type": "vote",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "add",
+  "cardId": "...",
+  "voterId": "..."
+}
+```
+
+Duplicate votes are ignored.
 
 ## State Sync
 
-When a client connects, the server automatically requests state from all other participants on its behalf.
+`syncState` provides a snapshot with revisions:
 
-All connected clients respond with their current board state using `syncState`. The new client merges all responses to build the most complete picture of the board.
+```json
+{
+  "type": "syncState",
+  "targetClientId": "...",
+  "phase": "forming" | "reviewing",
+  "cards": [
+    { "id": "...", "rev": 2, "column": "well", "text": "...", "authorId": "..." }
+  ],
+  "votes": [
+    { "cardId": "...", "voterId": "..." }
+  ]
+}
+```
 
-This approach provides resilience against network partitions. If one client has stale or incomplete data, others may have the missing pieces.
+### Merge Rules
 
-The merge logic is idempotent:
+- For each card, keep the highest `rev`
+- Deletes are treated as higher-rev tombstones
+- Votes are unioned
+- Phase uses reviewing wins
 
-- Cards are added only if they do not already exist, matched by ID
-- Votes are unioned, each voter ID appears at most once per card
+## Phase Enforcement
 
-If a client receives board content that conflicts with the server reported phase, the server phase always takes precedence and the client must lock editing.
+Phase is enforced by clients:
+
+- Clients include their current phase in every operation
+- If a client is in reviewing and receives an operation with phase forming, it must reject it
+
+The transition is monotonic and idempotent.
 
 ## Client Identity
 
-Each client generates a random `clientId` and stores it locally, for example in localStorage. This ID is reused across reconnects to preserve vote ownership and readiness state during a session.
-
-If a user opens the board in a new browser or private window, they are treated as a new participant.
+Each client generates and persists a `clientId`.
+Opening the board in a new browser or private window creates a new participant identity.
 
 ## Connection Health and Heartbeats
 
-Because WebSocket connections can appear open even when the network path is broken, Delta Board uses lightweight application level heartbeats to keep presence accurate.
+Clients send `ping` every 10 seconds.
+Server drops connections after about 30 seconds of inactivity and broadcasts `participantsUpdate`.
 
-### Client Heartbeat
-
-Each client periodically sends a heartbeat message to the server.
-
-- Clients send `ping` every 10 seconds
-- Any normal message such as card edits, votes, or readiness updates also counts as activity and can reset the heartbeat timer
-
-### Server Timeout
-
-The server tracks the last activity time for each connection.
-
-If the server does not receive a `ping` or any other message from a client within a timeout window, for example 30 seconds, it:
-
-1. Closes the WebSocket connection
-2. Removes the participant from the presence list
-3. Broadcasts a `participantsUpdate` to the remaining clients
-
-Heartbeats are used to maintain accurate connection health and presence information. They do not directly modify board content or participate in state synchronization. However, because presence affects readiness quorum, heartbeats indirectly influence when a phase transition is allowed.
+Heartbeats maintain accurate presence. Because quorum depends on presence, they indirectly influence when a phase transition is allowed.

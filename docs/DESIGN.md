@@ -15,15 +15,18 @@ This approach simplifies deployment (single artifact), eliminates CORS concerns,
 
 ## Operation-Based Design
 
-Instead of syncing entire board state, Delta Board broadcasts atomic operations:
+Delta Board broadcasts atomic operations rather than syncing a single authoritative board snapshot.
 
-- Create card
-- Edit card
-- Delete card
-- Add vote
-- Remove vote
+This reduces merge complexity, but convergence still requires handling unreliable networks. The protocol is designed to tolerate loss, duplication, and out of order delivery.
 
-This approach eliminates most concurrency issues and enables clean conflict resolution. Under the hood, we may leverage [CRDTs](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type) (Conflict-free Replicated Data Types) as an implementation detail.
+Key properties:
+
+- Operations are idempotent via a unique `opId`
+- Senders retry operations until the server acknowledges receipt
+- Card edits use a per card monotonically increasing `rev` so late operations cannot overwrite newer ones
+- Vote state converges by unioning voter IDs
+
+CRDTs may be used as a future implementation detail, but the current design relies on simple idempotency, retries, and per entity revisions.
 
 ## Technology Stack
 

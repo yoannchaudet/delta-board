@@ -15,7 +15,7 @@ This is the writing and voting phase.
 Participants can:
 
 - Create, edit, and delete their own cards
-- Vote on cards, following product rules such as no self voting
+- Vote on cards, following product rules such as no self-voting
 - Mark themselves as ready to move to discussion
 
 The goal of this phase is to gather input from everyone.
@@ -50,20 +50,18 @@ Being ready means "I am done adding and voting for now".
 
 Participants can still edit and vote after marking ready until the board actually transitions.
 
-If a participant adds or edits a card, their ready state may be automatically cleared to keep the signal meaningful.
-
 ### Quorum
 
 The board can move to Reviewing when a readiness quorum is reached.
 
 Quorum is based on the number of currently connected participants and is designed to represent a clear majority without requiring unanimity.
 
-When quorum is reached
+When quorum is reached:
 
 - A button to move to Reviewing becomes visible
 - Any participant may trigger the transition
 
-If all connected participants are ready, the transition may also happen automatically.
+To limit automatic state change if clients accidentally disconnect at the same time, changing state is an explicit action.
 
 The system shows readiness as a simple count, such as **5 of 8 people are ready**.
 
@@ -71,7 +69,7 @@ No names are displayed.
 
 ### Transition Behavior
 
-When the board moves to Reviewing
+When the board moves to Reviewing:
 
 - The phase changes globally for all participants
 - Editing and voting are disabled
@@ -90,24 +88,24 @@ If the group decides they need more writing time after discussion has started, t
 
 From Reviewing, participants may create a new board based on the current one.
 
-The new board
+The new board:
 
 - Starts in Forming
-- Copies cards and action items
+- Copies cards
 - Optionally resets all votes
 - Has a new URL
 
 This represents a new writing round rather than a continuation of the original one.
 
-Changing boards requires a deliberate action by the group, which matches the social weight of extending a retrospective.
+Any client can do this operation. It is a client one that requires a social action (i.e. sharing the new board URL).
 
 ## Late Joiners
 
 Participants who join while the board is in Forming can write and vote as usual.
 
-Participants who join after the board has entered Reviewing can view the board and take part in discussion, but cannot edit or vote.
+Participants who join after the board has entered Reviewing can view the board and take part in discussion, but cannot edit or vote. Late joiners learn the current phase from existing participants via state synchronization.
 
-The phase never moves backward automatically due to people joining or leaving.
+The phase never moves backward due to people joining or leaving.
 
 ## Summary
 
@@ -123,18 +121,8 @@ This keeps Delta Board lightweight, predictable, and aligned with how real retro
 
 ## Appendix A — Readiness Quorum Table
 
-| Participants | Ready Needed | Rationale                               |
-| ------------ | ------------ | --------------------------------------- |
-| 1            | 1            | Agree with your inner self              |
-| 2            | 2            | Both participants should agree          |
-| 3            | 2            | One person cannot rush the group        |
-| 4            | 3            | Strong majority                         |
-| 5            | 3            | Balanced majority without being strict  |
-| 6            | 4            | Clear majority                          |
-| 7            | 5            | Majority with flexibility               |
-| 8            | 5            | One or two people can still be thinking |
-| 9            | 6            | Socially feels right                    |
-| 10           | 6            | Still avoids a veto problem             |
-| 12           | 8            | Majority without unanimity              |
-| 15           | 9            | Scales with group size                  |
-| 20           | 12           | Large group majority                    |
+| Participants (n) | Ready Needed | Rule                         |
+| ---------------- | ------------ | ---------------------------- |
+| 1                | 1            | Single participant           |
+| 2                | 2            | Both must agree              |
+| 3 to 20          | ⌈0.6 × n⌉    | At least 60% of participants |
