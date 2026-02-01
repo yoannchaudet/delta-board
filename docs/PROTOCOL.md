@@ -6,18 +6,240 @@ Delta Board uses WebSockets for real-time collaboration between clients. The ser
 
 | Type                 | Direction                     | Description                                              |
 | -------------------- | ----------------------------- | -------------------------------------------------------- |
-| `hello`              | Client → Server               | Initial handshake, includes clientId                     |
-| `welcome`            | Server → Client               | Returns participant counts, then initiates sync          |
-| `participantsUpdate` | Server → Clients              | Broadcast when presence or readiness changes             |
-| `setReady`           | Client → Server               | Participant updates readiness state                      |
-| `phaseChanged`       | Client → Clients (via Server) | Broadcast phase transition to reviewing                  |
-| `syncState`          | Client → Client (via Server)  | Send full board state to a new client                    |
-| `cardOp`             | Client → Clients (via Server) | Card operation (create, edit, or delete)                 |
-| `vote`               | Client → Clients (via Server) | Vote operation (add or remove)                           |
-| `ack`                | Server → Client               | Acknowledges receipt of an operation                     |
-| `error`              | Server → Client               | Indicates an operation was rejected                      |
-| `ping`               | Client → Server               | Heartbeat to indicate client is alive                    |
-| `pong`               | Server → Client               | Acknowledges heartbeat                                   |
+| [hello](#schema-hello)              | Client → Server               | Initial handshake, includes clientId                     |
+| [welcome](#schema-welcome)          | Server → Client               | Returns participant counts, then initiates sync          |
+| [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes             |
+| [setReady](#schema-setready)        | Client → Server               | Participant updates readiness state                      |
+| [phaseChanged](#schema-phasechanged) | Client → Clients (via Server) | Broadcast phase transition to reviewing                  |
+| [syncState](#schema-syncstate)      | Client → Client (via Server)  | Send full board state to a new client                    |
+| [cardOp](#schema-cardop)            | Client → Clients (via Server) | Card operation (create, edit, or delete)                 |
+| [vote](#schema-vote)                | Client → Clients (via Server) | Vote operation (add or remove)                           |
+| [ack](#schema-ack)                  | Server → Client               | Acknowledges receipt of an operation                     |
+| [error](#schema-error)              | Server → Client               | Indicates an operation was rejected                      |
+| [ping](#schema-ping)                | Client → Server               | Heartbeat to indicate client is alive                    |
+| [pong](#schema-pong)                | Server → Client               | Acknowledges heartbeat                                   |
+
+## Schema Version
+
+This document defines protocol schema **v1**.
+
+## Message Schemas
+
+All messages are JSON objects sent over the WebSocket connection.
+
+<a id="schema-common-types"></a>
+### Common Types
+
+- `opId`: string (UUID or collision-resistant unique id)
+- `clientId`: string (stable per browser profile)
+- `phase`: `"forming" | "reviewing"`
+- `column`: `"well" | "delta"`
+
+<a id="schema-id-generation"></a>
+### Id Generation
+
+- `clientId`: generated once and persisted per browser profile (UUID v4 recommended)
+- `opId`: generated per operation (UUID v4 recommended)
+- `cardId`: generated when a card is created (UUID v4 recommended)
+
+<a id="schema-hello"></a>
+### `hello` (Client → Server)
+
+```json
+{ "type": "hello", "clientId": "..." }
+```
+
+- `type` (string, required)
+- `clientId` (string, required)
+
+<a id="schema-welcome"></a>
+### `welcome` (Server → Client)
+
+```json
+{ "type": "welcome", "participantsCount": 4, "readyCount": 2 }
+```
+
+- `type` (string, required)
+- `participantsCount` (number, required)
+- `readyCount` (number, required)
+
+<a id="schema-participantsupdate"></a>
+### `participantsUpdate` (Server → Clients)
+
+```json
+{ "type": "participantsUpdate", "participantsCount": 5, "readyCount": 3 }
+```
+
+```json
+{ "type": "participantsUpdate", "participantsCount": 5, "readyCount": 3, "syncForClientId": "..." }
+```
+
+- `type` (string, required)
+- `participantsCount` (number, required)
+- `readyCount` (number, required)
+- `syncForClientId` (string, optional; when present, indicates who needs a [syncState](#schema-syncstate))
+
+<a id="schema-setready"></a>
+### `setReady` (Client → Server)
+
+```json
+{ "type": "setReady", "opId": "uuid", "isReady": true }
+```
+
+- `type` (string, required)
+- `opId` (string, required)
+- `isReady` (boolean, required)
+
+<a id="schema-phasechanged"></a>
+### `phaseChanged` (Client → Clients via Server)
+
+```json
+{ "type": "phaseChanged", "opId": "uuid", "phase": "reviewing" }
+```
+
+- `type` (string, required)
+- `opId` (string, required)
+- `phase` (string, required; target phase)
+
+<a id="schema-syncstate"></a>
+### `syncState` (Client → Client via Server)
+
+```json
+{
+  "type": "syncState",
+  "targetClientId": "...",
+  "phase": "forming",
+  "cards": [
+    { "id": "...", "rev": 2, "column": "well", "text": "...", "authorId": "..." }
+  ],
+  "votes": [
+    { "cardId": "...", "voterId": "..." }
+  ]
+}
+```
+
+- `type` (string, required)
+- `targetClientId` (string, required)
+- `phase` (string, required)
+- `cards` (array, required)
+  - `id` (string, required)
+  - `rev` (number, required)
+  - `column` (string, required)
+  - `text` (string, required)
+  - `authorId` (string, required)
+- `votes` (array, required)
+  - `cardId` (string, required)
+  - `voterId` (string, required)
+
+<a id="schema-cardop"></a>
+### `cardOp` (Client → Clients via Server)
+
+Create:
+
+```json
+{
+  "type": "cardOp",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "create",
+  "cardId": "...",
+  "rev": 1,
+  "column": "well",
+  "text": "...",
+  "authorId": "..."
+}
+```
+
+Edit:
+
+```json
+{
+  "type": "cardOp",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "edit",
+  "cardId": "...",
+  "rev": 2,
+  "column": "well",
+  "text": "Updated text"
+}
+```
+
+Delete:
+
+```json
+{
+  "type": "cardOp",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "delete",
+  "cardId": "...",
+  "rev": 3
+}
+```
+
+- `type` (string, required)
+- `opId` (string, required)
+- `phase` (string, required)
+- `action` (string, required: `create | edit | delete`)
+- `cardId` (string, required)
+- `rev` (number, required)
+- `column` (string, required for `create` and optional for `edit`)
+- `text` (string, required for `create` and optional for `edit`)
+- `authorId` (string, required for `create`, `edit`, and `delete`)
+
+<a id="schema-vote"></a>
+### `vote` (Client → Clients via Server)
+
+```json
+{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "add", "cardId": "...", "voterId": "..." }
+```
+
+```json
+{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "remove", "cardId": "...", "voterId": "..." }
+```
+
+- `type` (string, required)
+- `opId` (string, required)
+- `phase` (string, required)
+- `action` (string, required: `add | remove`)
+- `cardId` (string, required)
+- `voterId` (string, required)
+
+<a id="schema-ack"></a>
+### `ack` (Server → Client)
+
+```json
+{ "type": "ack", "opId": "uuid" }
+```
+
+- `type` (string, required)
+- `opId` (string, required)
+
+<a id="schema-error"></a>
+### `error` (Server → Client)
+
+```json
+{ "type": "error", "opId": "uuid", "reason": "invalidPhase" }
+```
+
+- `type` (string, required)
+- `opId` (string, required)
+- `reason` (string, required)
+
+<a id="schema-ping"></a>
+<a id="schema-pong"></a>
+### `ping` / `pong`
+
+```json
+{ "type": "ping" }
+```
+
+```json
+{ "type": "pong" }
+```
+
+- `type` (string, required)
 
 ## Server Authority
 
@@ -31,29 +253,34 @@ The server does not track:
 - Board phase (managed by clients via replicated state)
 - Cards or votes (managed by clients)
 
-Clients must treat `participantsUpdate` events from the server as the source of truth for presence and readiness.
+Clients must treat [participantsUpdate](#schema-participantsupdate) events from the server as the source of truth for presence and readiness.
+
+## Trust Model
+
+Clients are assumed to be controlled by us. The protocol favors simplicity over adversarial security.
+Malicious or modified clients can cheat (for example, forging votes or bypassing phase rules), and we accept this limitation.
 
 ## Reliable Operation Delivery
 
-All state-changing client operations (`cardOp`, `vote`, `setReady`, `phaseChanged`) must include a unique `opId`.
+All state-changing client operations ([cardOp](#schema-cardop), [vote](#schema-vote), [setReady](#schema-setready), [phaseChanged](#schema-phasechanged)) must include a unique `opId`.
 
 The server acknowledges receipt:
-
-```json
-{ "type": "ack", "opId": "uuid" }
-```
+See the `ack` schema in the Message Schemas section: [ack](#schema-ack).
 
 If the client does not receive an `ack` within a short timeout, it must retry sending the same operation with the same `opId`.
+Clients should use exponential backoff with jitter to avoid retry storms on flaky connections.
 
 If an operation is invalid, the server responds:
-
-```json
-{ "type": "error", "opId": "uuid", "reason": "invalidPhase" }
-```
+See the `error` schema in the Message Schemas section: [error](#schema-error).
 
 This provides at-least-once delivery with idempotent convergence.
 
+Clients keep all seen `opId` values in memory for the life of the board session.
+Boards are short-lived, so unbounded growth is acceptable for this project.
+
 ## Connection Flow
+
+See the [hello](#schema-hello), [welcome](#schema-welcome), [participantsUpdate](#schema-participantsupdate), and [syncState](#schema-syncstate) schemas.
 
 ```mermaid
 sequenceDiagram
@@ -77,6 +304,7 @@ sequenceDiagram
 ## Operation Broadcast Flow
 
 All operations are idempotent and include an `opId`.
+See the [cardOp](#schema-cardop) and [ack](#schema-ack) schemas.
 
 ```mermaid
 sequenceDiagram
@@ -96,6 +324,7 @@ Clients must ignore duplicate operations based on `opId`.
 ## Card Revision Model
 
 Each card has a monotonically increasing `rev` managed by the card author.
+See the [cardOp](#schema-cardop) schema.
 
 ```json
 {
@@ -114,9 +343,15 @@ This prevents older edits from overwriting newer ones.
 
 Deletes are also versioned operations and must carry a higher `rev`.
 
+### Revision Tie-Break
+
+If two updates arrive with the same `rev`, clients break ties deterministically by comparing the `clientId` of the author.
+The update with the lexicographically higher `clientId` wins.
+
 ## Vote Model
 
 Votes converge by union. Each vote operation contains an `opId` and is idempotent.
+See the [vote](#schema-vote) schema.
 
 ```json
 {
@@ -133,28 +368,20 @@ Duplicate votes are ignored.
 
 ## State Sync
 
-`syncState` provides a snapshot with revisions:
-
-```json
-{
-  "type": "syncState",
-  "targetClientId": "...",
-  "phase": "forming" | "reviewing",
-  "cards": [
-    { "id": "...", "rev": 2, "column": "well", "text": "...", "authorId": "..." }
-  ],
-  "votes": [
-    { "cardId": "...", "voterId": "..." }
-  ]
-}
-```
+`syncState` provides a snapshot with revisions. See the `syncState` schema in the Message Schemas section: [syncState](#schema-syncstate).
 
 ### Merge Rules
 
 - For each card, keep the highest `rev`
+- If two card updates have the same `rev`, apply the revision tie-break rule
+- Deletes take precedence over edits when `rev` is equal
 - Deletes are treated as higher-rev tombstones
 - Votes are unioned
 - Phase uses reviewing wins
+
+Clients may receive multiple `syncState` responses when joining.
+Applying these merge rules across all received snapshots is sufficient for convergence.
+Clients should accept and merge all `syncState` messages received within a short join window (for example, 1-2 seconds) and ignore late arrivals.
 
 ## Phase Enforcement
 
@@ -165,6 +392,15 @@ Phase is enforced by clients:
 
 The transition is monotonic and idempotent.
 
+## Client Validation
+
+Clients must validate outgoing and incoming operations:
+
+- Required fields are present and well-typed
+- `phase` matches the current local phase
+- `rev` is a non-decreasing integer per card
+- `cardId`/`opId`/`clientId` are valid ids
+
 ## Client Identity
 
 Each client generates and persists a `clientId`.
@@ -172,7 +408,7 @@ Opening the board in a new browser or private window creates a new participant i
 
 ## Connection Health and Heartbeats
 
-Clients send `ping` every 10 seconds.
-Server drops connections after about 30 seconds of inactivity and broadcasts `participantsUpdate`.
+Clients send [ping](#schema-ping) every 10 seconds.
+Server drops connections after about 30 seconds of inactivity and broadcasts [participantsUpdate](#schema-participantsupdate).
 
 Heartbeats maintain accurate presence. Because quorum depends on presence, they indirectly influence when a phase transition is allowed.

@@ -36,6 +36,11 @@ CRDTs may be used as a future implementation detail, but the current design reli
 - **Storage**: Browser localStorage API
 - **Testing**: xUnit (server), Vitest (client)
 
+### Local Storage Schema
+
+Client state is persisted in localStorage using a versioned schema.
+Clients should store a `schemaVersion` alongside board data and reset or migrate when the stored version is unsupported.
+
 ## URL Format
 
 Boards use human-readable URLs with collision-resistant hashing:
