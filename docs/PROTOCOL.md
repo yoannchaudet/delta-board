@@ -279,6 +279,27 @@ This provides at-least-once delivery with idempotent convergence.
 Clients keep all seen `opId` values in memory for the life of the board session.
 Boards are short-lived, so unbounded growth is acceptable for this project.
 
+### Reliability & Acknowledgements
+
+The following messages MUST include `opId` and participate in ack/retry:
+
+- [cardOp](#schema-cardop)
+- [vote](#schema-vote)
+- [setReady](#schema-setready)
+- [phaseChanged](#schema-phasechanged)
+
+The following messages do NOT include `opId` and are not acked:
+
+- [hello](#schema-hello)
+- [welcome](#schema-welcome)
+- [participantsUpdate](#schema-participantsupdate)
+- [syncState](#schema-syncstate)
+- [ack](#schema-ack)
+- [error](#schema-error)
+- [ping](#schema-ping) / [pong](#schema-pong)
+
+`opId` uniqueness is per board session and should be treated as globally unique within a board.
+
 ## Connection Flow
 
 See the [hello](#schema-hello), [welcome](#schema-welcome), [participantsUpdate](#schema-participantsupdate), and [syncState](#schema-syncstate) schemas.
