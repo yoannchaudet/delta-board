@@ -24,7 +24,7 @@ Key properties:
 - Operations are idempotent via a unique `opId`
 - Senders retry operations until the server acknowledges receipt
 - Card edits use a per card monotonically increasing `rev` so late operations cannot overwrite newer ones
-- Vote state converges by unioning voter IDs
+- Vote state converges with an LWW boolean per (cardId, voterId) using a monotonic rev
 
 CRDTs may be used as a future implementation detail, but the current design relies on simple idempotency, retries, and per entity revisions.
 

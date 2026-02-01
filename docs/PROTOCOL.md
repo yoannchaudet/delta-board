@@ -34,6 +34,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `clientId`: string (stable per browser profile)
 - `phase`: `"forming" | "reviewing"`
 - `column`: `"well" | "delta"`
+- `rev`: number (monotonic per entity, including votes)
 
 <a id="schema-id-generation"></a>
 ### Id Generation
@@ -110,10 +111,10 @@ All messages are JSON objects sent over the WebSocket connection.
   "targetClientId": "...",
   "phase": "forming",
   "cards": [
-    { "id": "...", "rev": 2, "column": "well", "text": "...", "authorId": "..." }
+    { "id": "...", "rev": 2, "column": "well", "text": "...", "authorId": "...", "isDeleted": false }
   ],
   "votes": [
-    { "cardId": "...", "voterId": "..." }
+    { "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }
   ]
 }
 ```
@@ -127,9 +128,12 @@ All messages are JSON objects sent over the WebSocket connection.
   - `column` (string, required)
   - `text` (string, required)
   - `authorId` (string, required)
+  - `isDeleted` (boolean, required)
 - `votes` (array, required)
   - `cardId` (string, required)
   - `voterId` (string, required)
+  - `rev` (number, required)
+  - `isDeleted` (boolean, required)
 
 <a id="schema-cardop"></a>
 ### `cardOp` (Client → Clients via Server)
@@ -192,11 +196,11 @@ Delete:
 ### `vote` (Client → Clients via Server)
 
 ```json
-{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "add", "cardId": "...", "voterId": "..." }
+{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "add", "cardId": "...", "voterId": "...", "rev": 2 }
 ```
 
 ```json
-{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "remove", "cardId": "...", "voterId": "..." }
+{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "remove", "cardId": "...", "voterId": "...", "rev": 3 }
 ```
 
 - `type` (string, required)
@@ -205,6 +209,7 @@ Delete:
 - `action` (string, required: `add | remove`)
 - `cardId` (string, required)
 - `voterId` (string, required)
+- `rev` (number, required; monotonic per `voterId` per `cardId`)
 
 <a id="schema-ack"></a>
 ### `ack` (Server → Client)
@@ -361,6 +366,7 @@ Clients apply a card edit only if the incoming `rev` is greater than the stored 
 This prevents older edits from overwriting newer ones.
 
 Deletes are also versioned operations and must carry a higher `rev`.
+Deleted cards must be retained as tombstones (`isDeleted: true`) so they do not resurrect during merges.
 
 ### Revision Tie-Break
 
@@ -369,7 +375,8 @@ The update with the lexicographically higher `clientId` wins.
 
 ## Vote Model
 
-Votes converge by union. Each vote operation contains an `opId` and is idempotent.
+Each card allows one vote per `voterId`. Votes use LWW per `(cardId, voterId)` with a monotonic `rev`.
+Each vote operation contains an `opId` and is idempotent.
 See the [vote](#schema-vote) schema.
 
 ```json
@@ -383,7 +390,8 @@ See the [vote](#schema-vote) schema.
 }
 ```
 
-Duplicate votes are ignored.
+Clients apply a vote update only if the incoming `rev` is greater than the stored value for that `(cardId, voterId)`.
+If `rev` is equal, `remove` wins to avoid resurrecting a vote.
 
 ## State Sync
 
@@ -394,8 +402,8 @@ Duplicate votes are ignored.
 - For each card, keep the highest `rev`
 - If two card updates have the same `rev`, apply the revision tie-break rule
 - Deletes take precedence over edits when `rev` is equal
-- Deletes are treated as higher-rev tombstones
-- Votes are unioned
+- Deleted cards are represented by `isDeleted: true` tombstones
+- For each `(cardId, voterId)`, keep the highest `rev` and apply the LWW vote state
 - Phase uses reviewing wins
 
 Clients may receive multiple `syncState` responses when joining.
@@ -421,6 +429,7 @@ Clients must validate outgoing and incoming operations:
 - Required fields are present and well-typed
 - `phase` matches the current local phase
 - `rev` is a non-decreasing integer per card
+- `rev` is a non-decreasing integer per `(cardId, voterId)`
 - `cardId`/`opId`/`clientId` are valid ids
 
 ## Client Identity
