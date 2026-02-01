@@ -37,6 +37,9 @@ export function createConnection(boardId, callbacks = {}) {
     /** @type {number | null} */
     let pingInterval = null;
 
+    /** @type {number | null} */
+    let pongTimeout = null;
+
     /** @type {number} */
     let reconnectAttempts = 0;
 
@@ -87,10 +90,10 @@ export function createConnection(boardId, callbacks = {}) {
             socket.onclose = (event) => {
                 cleanup();
 
-                if (event.code === 4000) {
-                    // Board full - don't reconnect
+                if (event.code === 1008 || event.code === 4000) {
+                    // Policy violation (board full / duplicate clientId) - don't reconnect
                     setState('closed');
-                    callbacks.onError?.('Board is full');
+                    callbacks.onError?.(event.reason || 'Connection rejected');
                 } else if (state !== 'closed') {
                     setState('disconnected');
                     scheduleReconnect();
@@ -128,7 +131,7 @@ export function createConnection(boardId, callbacks = {}) {
                     break;
 
                 case 'pong':
-                    // Heartbeat response - nothing to do
+                    clearPongTimeout();
                     break;
 
                 case 'ack':
@@ -157,9 +160,25 @@ export function createConnection(boardId, callbacks = {}) {
         stopPing();
         pingInterval = setInterval(() => {
             if (socket?.readyState === WebSocket.OPEN) {
+                schedulePongTimeout();
                 socket.send(JSON.stringify({ type: 'ping' }));
             }
         }, PING_INTERVAL_MS);
+    }
+
+    function schedulePongTimeout() {
+        clearPongTimeout();
+        pongTimeout = setTimeout(() => {
+            // Missed pong: reconnect
+            socket?.close();
+        }, PING_INTERVAL_MS + 2000);
+    }
+
+    function clearPongTimeout() {
+        if (pongTimeout !== null) {
+            clearTimeout(pongTimeout);
+            pongTimeout = null;
+        }
     }
 
     function stopPing() {
@@ -167,6 +186,7 @@ export function createConnection(boardId, callbacks = {}) {
             clearInterval(pingInterval);
             pingInterval = null;
         }
+        clearPongTimeout();
     }
 
     function scheduleReconnect() {
@@ -196,8 +216,8 @@ export function createConnection(boardId, callbacks = {}) {
 
     function disconnect() {
         setState('closed');
-        cleanup();
         socket?.close();
+        cleanup();
     }
 
     function send(message) {

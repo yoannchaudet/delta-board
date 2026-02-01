@@ -55,7 +55,7 @@ public sealed class BoardHub
             await SendWelcome(webSocket, board, cancellationToken);
 
             // Notify existing participants
-            await BroadcastParticipantsUpdate(board, clientId);
+            await BroadcastParticipantsUpdate(board, null);
 
             // Main message loop
             await ReceiveMessages(board, clientId, webSocket, cancellationToken);
@@ -78,23 +78,20 @@ public sealed class BoardHub
 
     private static async Task<string?> WaitForHello(WebSocket webSocket, CancellationToken cancellationToken)
     {
-        var buffer = new byte[1024];
-
         try
         {
             using var helloCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             helloCts.CancelAfter(TimeSpan.FromSeconds(HelloTimeoutSeconds));
 
-            var result = await webSocket.ReceiveAsync(buffer, helloCts.Token);
+            var (messageType, message) = await ReceiveMessage(webSocket, 1024, helloCts.Token);
 
-            if (result.MessageType is WebSocketMessageType.Close)
+            if (messageType is WebSocketMessageType.Close)
             {
                 return null;
             }
 
-            if (result.MessageType is WebSocketMessageType.Text)
+            if (messageType is WebSocketMessageType.Text && message is not null)
             {
-                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
                 using var doc = JsonDocument.Parse(message);
 
                 if (doc.RootElement.TryGetProperty("type", out var typeEl) &&
@@ -163,7 +160,7 @@ public sealed class BoardHub
                 using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 receiveCts.CancelAfter(TimeSpan.FromSeconds(ReceiveTimeoutSeconds));
 
-                var result = await webSocket.ReceiveAsync(buffer, receiveCts.Token);
+                var (messageType, message) = await ReceiveMessage(webSocket, BufferSize, receiveCts.Token);
 
                 // Update last activity timestamp
                 if (board.Participants.TryGetValue(clientId, out var participant))
@@ -171,7 +168,7 @@ public sealed class BoardHub
                     participant.LastActivity = DateTime.UtcNow;
                 }
 
-                if (result.MessageType is WebSocketMessageType.Close)
+                if (messageType is WebSocketMessageType.Close)
                 {
                     await webSocket.CloseAsync(
                         WebSocketCloseStatus.NormalClosure,
@@ -180,9 +177,8 @@ public sealed class BoardHub
                     break;
                 }
 
-                if (result.MessageType is WebSocketMessageType.Text)
+                if (messageType is WebSocketMessageType.Text && message is not null)
                 {
-                    var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
                     await HandleMessage(board, clientId, message);
                 }
             }
@@ -203,6 +199,38 @@ public sealed class BoardHub
                 }
             }
         }
+    }
+
+    private static async Task<(WebSocketMessageType type, string? text)> ReceiveMessage(
+        WebSocket webSocket,
+        int bufferSize,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[bufferSize];
+        var builder = new StringBuilder();
+        WebSocketReceiveResult result;
+
+        do
+        {
+            result = await webSocket.ReceiveAsync(buffer, cancellationToken);
+
+            if (result.MessageType is WebSocketMessageType.Close)
+            {
+                return (WebSocketMessageType.Close, null);
+            }
+
+            if (result.MessageType is WebSocketMessageType.Text && result.Count > 0)
+            {
+                builder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
+            }
+        } while (!result.EndOfMessage);
+
+        if (result.MessageType is WebSocketMessageType.Text)
+        {
+            return (WebSocketMessageType.Text, builder.ToString());
+        }
+
+        return (result.MessageType, null);
     }
 
     private async Task HandleMessage(BoardState board, string senderId, string message)
@@ -315,7 +343,7 @@ public sealed class BoardHub
         await webSocket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
     }
 
-    private static async Task BroadcastParticipantsUpdate(BoardState board, string excludeClientId)
+    private static async Task BroadcastParticipantsUpdate(BoardState board, string? excludeClientId)
     {
         var update = new
         {
@@ -328,7 +356,8 @@ public sealed class BoardHub
         var bytes = Encoding.UTF8.GetBytes(json);
 
         var tasks = board.Participants
-            .Where(kvp => kvp.Key != excludeClientId && kvp.Value.Socket.State is WebSocketState.Open)
+            .Where(kvp => excludeClientId is null || kvp.Key != excludeClientId)
+            .Where(kvp => kvp.Value.Socket.State is WebSocketState.Open)
             .Select(kvp => SendRaw(kvp.Value.Socket, Encoding.UTF8.GetString(bytes), CancellationToken.None));
 
         await Task.WhenAll(tasks);
