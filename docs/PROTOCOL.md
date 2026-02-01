@@ -56,12 +56,13 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `welcome` (Server → Client)
 
 ```json
-{ "type": "welcome", "participantsCount": 4, "readyCount": 2 }
+{ "type": "welcome", "participantsCount": 4, "readyCount": 2, "hasState": true }
 ```
 
 - `type` (string, required)
 - `participantsCount` (number, required)
 - `readyCount` (number, required)
+- `hasState` (boolean, required; false means the board currently has no synced state)
 
 <a id="schema-participantsupdate"></a>
 ### `participantsUpdate` (Server → Clients)
@@ -382,6 +383,8 @@ Duplicate votes are ignored.
 Clients may receive multiple `syncState` responses when joining.
 Applying these merge rules across all received snapshots is sufficient for convergence.
 Clients should accept and merge all `syncState` messages received within a short join window (for example, 1-2 seconds) and ignore late arrivals.
+When a client joins, it must wait the full sync window before using the board, and it must apply all snapshots received during that window.
+If no client with intact local state reconnects, the board state cannot be recovered.
 
 ## Phase Enforcement
 
