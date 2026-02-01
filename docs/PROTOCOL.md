@@ -119,7 +119,7 @@ All messages are JSON objects sent over the WebSocket connection.
 ```
 
 - `type` (string, required)
-- `targetClientId` (string, required)
+- `targetClientId` (string, optional; when omitted, server broadcasts to all clients except the sender)
 - `phase` (string, required)
 - `cards` (array, required)
   - `id` (string, required)
@@ -403,6 +403,7 @@ Applying these merge rules across all received snapshots is sufficient for conve
 Clients should accept and merge all `syncState` messages received within a short join window (for example, 1-2 seconds) and ignore late arrivals.
 When a client joins, it must wait the full sync window before using the board, and it must apply all snapshots received during that window.
 If no client with intact local state reconnects, the board state cannot be recovered.
+If the local state changes as a result of the join-time merge, the client should proactively broadcast its merged `syncState` once.
 
 ## Phase Enforcement
 
