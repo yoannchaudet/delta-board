@@ -4,20 +4,20 @@ Delta Board uses WebSockets for real-time collaboration between clients. The ser
 
 ## Message Types
 
-| Type                 | Direction                     | Description                                              |
-| -------------------- | ----------------------------- | -------------------------------------------------------- |
-| [hello](#schema-hello)              | Client → Server               | Initial handshake, includes clientId                     |
-| [welcome](#schema-welcome)          | Server → Client               | Returns participant counts, then initiates sync          |
-| [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes             |
-| [setReady](#schema-setready)        | Client → Server               | Participant updates readiness state                      |
-| [phaseChanged](#schema-phasechanged) | Client → Clients (via Server) | Broadcast phase transition to reviewing                  |
-| [syncState](#schema-syncstate)      | Client → Client (via Server)  | Send full board state to a new client                    |
-| [cardOp](#schema-cardop)            | Client → Clients (via Server) | Card operation (create, edit, or delete)                 |
-| [vote](#schema-vote)                | Client → Clients (via Server) | Vote operation (add or remove)                           |
-| [ack](#schema-ack)                  | Server → Client               | Acknowledges receipt of an operation                     |
-| [error](#schema-error)              | Server → Client               | Indicates an operation was rejected                      |
-| [ping](#schema-ping)                | Client → Server               | Heartbeat to indicate client is alive                    |
-| [pong](#schema-pong)                | Server → Client               | Acknowledges heartbeat                                   |
+| Type                                             | Direction                     | Description                                     |
+| ------------------------------------------------ | ----------------------------- | ----------------------------------------------- |
+| [hello](#schema-hello)                           | Client → Server               | Initial handshake, includes clientId            |
+| [welcome](#schema-welcome)                       | Server → Client               | Returns participant counts, then initiates sync |
+| [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes    |
+| [setReady](#schema-setready)                     | Client → Server               | Participant updates readiness state             |
+| [phaseChanged](#schema-phasechanged)             | Client → Clients (via Server) | Broadcast phase transition to reviewing         |
+| [syncState](#schema-syncstate)                   | Client → Client (via Server)  | Send full board state to a new client           |
+| [cardOp](#schema-cardop)                         | Client → Clients (via Server) | Card operation (create, edit, or delete)        |
+| [vote](#schema-vote)                             | Client → Clients (via Server) | Vote operation (add or remove)                  |
+| [ack](#schema-ack)                               | Server → Client               | Acknowledges receipt of an operation            |
+| [error](#schema-error)                           | Server → Client               | Indicates an operation was rejected             |
+| [ping](#schema-ping)                             | Client → Server               | Heartbeat to indicate client is alive           |
+| [pong](#schema-pong)                             | Server → Client               | Acknowledges heartbeat                          |
 
 ## Schema Version
 
@@ -28,6 +28,7 @@ This document defines protocol schema **v1**.
 All messages are JSON objects sent over the WebSocket connection.
 
 <a id="schema-common-types"></a>
+
 ### Common Types
 
 - `opId`: string (UUID or collision-resistant unique id)
@@ -37,6 +38,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `rev`: number (monotonic per entity, including votes)
 
 <a id="schema-id-generation"></a>
+
 ### Id Generation
 
 - `clientId`: generated once and persisted per browser profile (UUID v4 recommended)
@@ -44,6 +46,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `cardId`: generated when a card is created (UUID v4 recommended)
 
 <a id="schema-hello"></a>
+
 ### `hello` (Client → Server)
 
 ```json
@@ -54,6 +57,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `clientId` (string, required)
 
 <a id="schema-welcome"></a>
+
 ### `welcome` (Server → Client)
 
 ```json
@@ -65,6 +69,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `readyCount` (number, required)
 
 <a id="schema-participantsupdate"></a>
+
 ### `participantsUpdate` (Server → Clients)
 
 ```json
@@ -72,7 +77,12 @@ All messages are JSON objects sent over the WebSocket connection.
 ```
 
 ```json
-{ "type": "participantsUpdate", "participantsCount": 5, "readyCount": 3, "syncForClientId": "..." }
+{
+  "type": "participantsUpdate",
+  "participantsCount": 5,
+  "readyCount": 3,
+  "syncForClientId": "..."
+}
 ```
 
 - `type` (string, required)
@@ -81,6 +91,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `syncForClientId` (string, optional; when present, indicates who needs a [syncState](#schema-syncstate))
 
 <a id="schema-setready"></a>
+
 ### `setReady` (Client → Server)
 
 ```json
@@ -92,6 +103,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `isReady` (boolean, required)
 
 <a id="schema-phasechanged"></a>
+
 ### `phaseChanged` (Client → Clients via Server)
 
 ```json
@@ -103,6 +115,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `phase` (string, required; target phase)
 
 <a id="schema-syncstate"></a>
+
 ### `syncState` (Client → Client via Server)
 
 ```json
@@ -111,11 +124,16 @@ All messages are JSON objects sent over the WebSocket connection.
   "targetClientId": "...",
   "phase": "forming",
   "cards": [
-    { "id": "...", "rev": 2, "column": "well", "text": "...", "authorId": "...", "isDeleted": false }
+    {
+      "id": "...",
+      "rev": 2,
+      "column": "well",
+      "text": "...",
+      "authorId": "...",
+      "isDeleted": false
+    }
   ],
-  "votes": [
-    { "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }
-  ]
+  "votes": [{ "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }]
 }
 ```
 
@@ -136,6 +154,7 @@ All messages are JSON objects sent over the WebSocket connection.
   - `isDeleted` (boolean, required)
 
 <a id="schema-cardop"></a>
+
 ### `cardOp` (Client → Clients via Server)
 
 Create:
@@ -165,7 +184,8 @@ Edit:
   "cardId": "...",
   "rev": 2,
   "column": "well",
-  "text": "Updated text"
+  "text": "Updated text",
+  "authorId": "..."
 }
 ```
 
@@ -178,7 +198,8 @@ Delete:
   "phase": "forming",
   "action": "delete",
   "cardId": "...",
-  "rev": 3
+  "rev": 3,
+  "authorId": "..."
 }
 ```
 
@@ -193,14 +214,31 @@ Delete:
 - `authorId` (string, required for `create`, `edit`, and `delete`)
 
 <a id="schema-vote"></a>
+
 ### `vote` (Client → Clients via Server)
 
 ```json
-{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "add", "cardId": "...", "voterId": "...", "rev": 2 }
+{
+  "type": "vote",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "add",
+  "cardId": "...",
+  "voterId": "...",
+  "rev": 2
+}
 ```
 
 ```json
-{ "type": "vote", "opId": "uuid", "phase": "forming", "action": "remove", "cardId": "...", "voterId": "...", "rev": 3 }
+{
+  "type": "vote",
+  "opId": "uuid",
+  "phase": "forming",
+  "action": "remove",
+  "cardId": "...",
+  "voterId": "...",
+  "rev": 3
+}
 ```
 
 - `type` (string, required)
@@ -212,6 +250,7 @@ Delete:
 - `rev` (number, required; monotonic per `voterId` per `cardId`)
 
 <a id="schema-ack"></a>
+
 ### `ack` (Server → Client)
 
 ```json
@@ -222,6 +261,7 @@ Delete:
 - `opId` (string, required)
 
 <a id="schema-error"></a>
+
 ### `error` (Server → Client)
 
 ```json
@@ -234,6 +274,7 @@ Delete:
 
 <a id="schema-ping"></a>
 <a id="schema-pong"></a>
+
 ### `ping` / `pong`
 
 ```json
@@ -347,6 +388,8 @@ Clients must ignore duplicate operations based on `opId`.
 
 ## Card Revision Model
 
+Cards follow a Last-Write-Wins (LWW) model per card.
+
 Each card has a monotonically increasing `rev` managed by the card author.
 See the [cardOp](#schema-cardop) schema.
 
@@ -392,6 +435,7 @@ See the [vote](#schema-vote) schema.
 
 Clients apply a vote update only if the incoming `rev` is greater than the stored value for that `(cardId, voterId)`.
 If `rev` is equal, `remove` wins to avoid resurrecting a vote.
+In `syncState`, `isDeleted: true` represents a removed vote tombstone.
 
 ## State Sync
 
@@ -399,19 +443,19 @@ If `rev` is equal, `remove` wins to avoid resurrecting a vote.
 
 ### Merge Rules
 
-- For each card, keep the highest `rev`
-- If two card updates have the same `rev`, apply the revision tie-break rule
-- Deletes take precedence over edits when `rev` is equal
-- Deleted cards are represented by `isDeleted: true` tombstones
-- For each `(cardId, voterId)`, keep the highest `rev` and apply the LWW vote state
-- Phase uses reviewing wins
+Cards and votes share the same LWW merge rule:
+
+- For each entity (card by `id`, vote by `(cardId, voterId)`), keep the highest `rev`
+- If `rev` is equal, compare the entity owner id (card: `authorId`, vote: `voterId`) lexicographically; higher wins
+- If `rev` and owner id are equal, `isDeleted: true` wins to prevent resurrection
+
+Phase is monotonic: `reviewing` overrides `forming` whenever states are merged.
 
 Clients may receive multiple `syncState` responses when joining.
-Applying these merge rules across all received snapshots is sufficient for convergence.
-Clients should accept and merge all `syncState` messages received within a short join window (for example, 1-2 seconds) and ignore late arrivals.
-When a client joins, it must wait the full sync window before using the board, and it must apply all snapshots received during that window.
-If no client with intact local state reconnects, the board state cannot be recovered.
+For a stable initial view, clients should wait a short join window (for example, 1-2 seconds) to collect snapshots before using the board.
+If no `syncState` arrives in that window, proceed with local state and continue listening for later snapshots.
 If the local state changes as a result of the join-time merge, the client should proactively broadcast its merged `syncState` once.
+If no client with intact local state reconnects, the board state cannot be recovered.
 
 ## Phase Enforcement
 
