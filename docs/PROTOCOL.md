@@ -56,13 +56,12 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `welcome` (Server → Client)
 
 ```json
-{ "type": "welcome", "participantsCount": 4, "readyCount": 2, "hasState": true }
+{ "type": "welcome", "participantsCount": 4, "readyCount": 2 }
 ```
 
 - `type` (string, required)
 - `participantsCount` (number, required)
 - `readyCount` (number, required)
-- `hasState` (boolean, required; false means the board currently has no synced state)
 
 <a id="schema-participantsupdate"></a>
 ### `participantsUpdate` (Server → Clients)
@@ -221,7 +220,7 @@ Delete:
 ### `error` (Server → Client)
 
 ```json
-{ "type": "error", "opId": "uuid", "reason": "invalidPhase" }
+{ "type": "error", "opId": "uuid", "reason": "Invalid message" }
 ```
 
 - `type` (string, required)
@@ -297,8 +296,6 @@ The following messages do NOT include `opId` and are not acked:
 - [ack](#schema-ack)
 - [error](#schema-error)
 - [ping](#schema-ping) / [pong](#schema-pong)
-
-`opId` uniqueness is per board session and should be treated as globally unique within a board.
 
 ## Connection Flow
 
