@@ -351,6 +351,30 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task WebSocket_DoesNotAbortBeforeInactivityTimeout()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"idle-test-{Guid.NewGuid():N}";
+
+        var ws = await ConnectAndHandshake(wsClient, boardId, "client-1");
+
+        try
+        {
+            // Act - stay idle longer than the old receive timeout
+            await Task.Delay(TimeSpan.FromSeconds(12));
+
+            await SendJson(ws, new { type = "ping" });
+            var pong = await ReceiveMessageOfType(ws, "pong", TimeSpan.FromSeconds(5));
+            Assert.Equal("pong", pong.GetProperty("type").GetString());
+        }
+        finally
+        {
+            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task WebSocket_HelloTimeout()
     {
         // Arrange
