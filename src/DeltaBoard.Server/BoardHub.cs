@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace DeltaBoard.Server;
 
@@ -27,7 +28,7 @@ public sealed class BoardHub
     {
         var board = _boards.GetOrAdd(boardId, _ => new BoardState());
         var connectionId = Guid.NewGuid().ToString("N");
-        _logger.LogInformation("WS connect {ConnectionId} board={BoardId}", connectionId, boardId);
+        _logger.LogInformation("ws-connect {ConnectionId} {BoardId}", connectionId, boardId);
 
         // Check capacity before handshake
         if (board.Participants.Count >= MaxParticipantsPerBoard)
@@ -44,14 +45,14 @@ public sealed class BoardHub
         var clientId = await WaitForHello(webSocket, cancellationToken);
         if (clientId is null)
         {
-            _logger.LogWarning("WS {ConnectionId} board={BoardId} no hello; closing", connectionId, boardId);
+            _logger.LogWarning("ws-no-hello {ConnectionId} {BoardId}", connectionId, boardId);
             return; // Connection closed or invalid hello
         }
 
         // Check for duplicate clientId
         if (!board.Participants.TryAdd(clientId, new ParticipantState(webSocket)))
         {
-            _logger.LogWarning("WS {ConnectionId} board={BoardId} duplicate clientId={ClientId}", connectionId, boardId, clientId);
+            _logger.LogWarning("ws-duplicate-client {ConnectionId} {BoardId} {ClientId}", connectionId, boardId, clientId);
             await SendError(webSocket, "Client ID already connected to this board", clientId, cancellationToken);
             await webSocket.CloseAsync(
                 WebSocketCloseStatus.PolicyViolation,
@@ -64,7 +65,7 @@ public sealed class BoardHub
         {
             // Send welcome
             await SendWelcome(webSocket, board, clientId, cancellationToken);
-            _logger.LogInformation("WS {ConnectionId} board={BoardId} client={ClientId} welcome sent", connectionId, boardId, clientId);
+            _logger.LogInformation("ws-welcome-sent {ConnectionId} {BoardId} {ClientId}", connectionId, boardId, clientId);
 
             // Notify existing participants (exclude the joiner; they already got welcome)
             await BroadcastParticipantsUpdate(board, clientId);
@@ -75,18 +76,18 @@ public sealed class BoardHub
         catch (OperationCanceledException)
         {
             // Server shutting down or request aborted
-            _logger.LogInformation("WS {ConnectionId} board={BoardId} client={ClientId} canceled", connectionId, boardId, clientId);
+            _logger.LogInformation("ws-canceled {ConnectionId} {BoardId} {ClientId}", connectionId, boardId, clientId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "WS {ConnectionId} board={BoardId} client={ClientId} exception", connectionId, boardId, clientId);
+            _logger.LogError(ex, "ws-exception {ConnectionId} {BoardId} {ClientId}", connectionId, boardId, clientId);
             throw;
         }
         finally
         {
             board.Participants.TryRemove(clientId, out _);
             await BroadcastParticipantsUpdate(board, clientId);
-            _logger.LogInformation("WS {ConnectionId} board={BoardId} client={ClientId} closed state={State} closeStatus={CloseStatus}",
+            _logger.LogInformation("ws-closed {ConnectionId} {BoardId} {ClientId} {State} {CloseStatus}",
                 connectionId,
                 boardId,
                 clientId,
@@ -129,7 +130,7 @@ public sealed class BoardHub
         }
         catch (JsonException)
         {
-            _logger.LogWarning("WS RX invalid hello JSON");
+            _logger.LogWarning("ws-invalid-hello-json");
         }
         catch (OperationCanceledException)
         {
@@ -195,7 +196,7 @@ public sealed class BoardHub
 
                 if (messageType is WebSocketMessageType.Close)
                 {
-                    _logger.LogInformation("WS message close client={ClientId} status={CloseStatus}", clientId, webSocket.CloseStatus);
+                    _logger.LogInformation("ws-close-received {ClientId} {CloseStatus}", clientId, webSocket.CloseStatus);
                     await webSocket.CloseAsync(
                         WebSocketCloseStatus.NormalClosure,
                         "Closing",
@@ -212,11 +213,11 @@ public sealed class BoardHub
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("WS receive canceled client={ClientId}", clientId);
+            _logger.LogInformation("ws-receive-canceled {ClientId}", clientId);
         }
         catch (WebSocketException ex)
         {
-            _logger.LogWarning(ex, "WS receive error client={ClientId} state={State}", clientId, webSocket.State);
+            _logger.LogWarning(ex, "ws-receive-error {ClientId} {State}", clientId, webSocket.State);
         }
         finally
         {
@@ -241,7 +242,7 @@ public sealed class BoardHub
                     var inactiveSeconds = (DateTime.UtcNow - participant.LastActivity).TotalSeconds;
                     if (inactiveSeconds >= InactivityTimeoutSeconds)
                     {
-                        _logger.LogWarning("WS inactivity timeout client={ClientId} inactiveSeconds={InactiveSeconds}", clientId, inactiveSeconds);
+                        _logger.LogWarning("ws-inactivity-timeout {ClientId} {InactiveSeconds}", clientId, inactiveSeconds);
                         if (webSocket.State is WebSocketState.Open)
                         {
                             await webSocket.CloseAsync(
@@ -260,7 +261,7 @@ public sealed class BoardHub
         }
         catch (WebSocketException ex)
         {
-            _logger.LogWarning(ex, "WS inactivity monitor error client={ClientId} state={State}", clientId, webSocket.State);
+            _logger.LogWarning(ex, "ws-inactivity-monitor-error {ClientId} {State}", clientId, webSocket.State);
         }
     }
 
@@ -336,7 +337,7 @@ public sealed class BoardHub
         }
         catch (JsonException)
         {
-            _logger.LogWarning("WS RX invalid JSON client={ClientId}", senderId);
+            _logger.LogWarning("ws-invalid-json {ClientId}", senderId);
         }
     }
 
@@ -451,7 +452,7 @@ public sealed class BoardHub
             type = "invalid-json";
         }
 
-        _logger.LogInformation("WS {Direction} client={ClientId} type={Type} bytes={Size} payload={Payload}",
+        _logger.LogInformation("ws-message {Direction} {ClientId} {Type} {Size} {Payload}",
             direction,
             clientId,
             type,
