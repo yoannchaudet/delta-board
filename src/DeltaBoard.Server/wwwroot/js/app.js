@@ -77,11 +77,6 @@ function initBoard(boardId) {
             }
         },
 
-        onAck: (opId) => {
-            console.log('Ack:', opId);
-            // TODO: Handle operation acknowledgment
-        },
-
         onError: (error) => {
             console.error('Connection error:', error);
             // TODO: Show error to user

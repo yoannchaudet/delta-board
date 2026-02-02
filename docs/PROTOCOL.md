@@ -14,7 +14,6 @@ Delta Board uses WebSockets for real-time collaboration between clients. The ser
 | [syncState](#schema-syncstate)                   | Client → Client (via Server)  | Send full board state to a new client           |
 | [cardOp](#schema-cardop)                         | Client → Clients (via Server) | Card operation (create, edit, or delete)        |
 | [vote](#schema-vote)                             | Client → Clients (via Server) | Vote operation (add or remove)                  |
-| [ack](#schema-ack)                               | Server → Client               | Acknowledges receipt of an operation            |
 | [error](#schema-error)                           | Server → Client               | Indicates an operation was rejected             |
 | [ping](#schema-ping)                             | Client → Server               | Heartbeat to indicate client is alive           |
 | [pong](#schema-pong)                             | Server → Client               | Acknowledges heartbeat                          |
@@ -251,16 +250,6 @@ Delete:
 - `voterId` (string, required)
 - `rev` (number, required; monotonic per `voterId` per `cardId`)
 
-<a id="schema-ack"></a>
-
-### `ack` (Server → Client)
-
-```json
-{ "type": "ack", "opId": "uuid" }
-```
-
-- `type` (string, required)
-- `opId` (string, required)
 
 <a id="schema-error"></a>
 
@@ -312,11 +301,6 @@ Malicious or modified clients can cheat (for example, forging votes or bypassing
 
 All state-changing client operations ([cardOp](#schema-cardop), [vote](#schema-vote), [setReady](#schema-setready), [phaseChanged](#schema-phasechanged)) must include a unique `opId`.
 
-The server acknowledges receipt:
-See the `ack` schema in the Message Schemas section: [ack](#schema-ack).
-
-If the client does not receive an `ack` within a short timeout, it must retry sending the same operation with the same `opId`.
-Clients should use exponential backoff with jitter to avoid retry storms on flaky connections.
 
 If an operation is invalid, the server responds:
 See the `error` schema in the Message Schemas section: [error](#schema-error).
@@ -328,20 +312,19 @@ Boards are short-lived, so unbounded growth is acceptable for this project.
 
 ### Reliability & Acknowledgements
 
-The following messages MUST include `opId` and participate in ack/retry:
+The following messages MUST include `opId`:
 
 - [cardOp](#schema-cardop)
 - [vote](#schema-vote)
 - [setReady](#schema-setready)
 - [phaseChanged](#schema-phasechanged)
 
-The following messages do NOT include `opId` and are not acked:
+The following messages do NOT include `opId`:
 
 - [hello](#schema-hello)
 - [welcome](#schema-welcome)
 - [participantsUpdate](#schema-participantsupdate)
 - [syncState](#schema-syncstate)
-- [ack](#schema-ack)
 - [error](#schema-error)
 - [ping](#schema-ping) / [pong](#schema-pong)
 
@@ -371,7 +354,6 @@ sequenceDiagram
 ## Operation Broadcast Flow
 
 All operations are idempotent and include an `opId`.
-See the [cardOp](#schema-cardop) and [ack](#schema-ack) schemas.
 
 ```mermaid
 sequenceDiagram
@@ -381,7 +363,6 @@ sequenceDiagram
     participant C as Client C
 
     A->>S: cardOp { opId }
-    S->>A: ack { opId }
     S->>B: cardOp
     S->>C: cardOp
 ```

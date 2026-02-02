@@ -199,10 +199,6 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
                 rev = 1
             });
 
-            // ws1 should receive ack
-            var ack = await ReceiveMessageOfType(ws1, "ack");
-            Assert.Equal("op-1", ack.GetProperty("opId").GetString());
-
             // ws2 should receive the cardOp
             var received = await ReceiveMessageOfType(ws2, "cardOp");
             Assert.Equal("card-1", received.GetProperty("cardId").GetString());
@@ -240,9 +236,6 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
                 isDeleted = false
             });
 
-            // ws1 should receive ack
-            var ack = await ReceiveMessageOfType(ws1, "ack");
-
             // ws2 should receive the vote
             var received = await ReceiveMessageOfType(ws2, "vote");
             Assert.Equal("card-1", received.GetProperty("cardId").GetString());
@@ -271,10 +264,6 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         {
             // Act - ws1 sets ready
             await SendJson(ws1, new { type = "setReady", opId = "ready-op-1", ready = true });
-
-            // ws1 should receive ack (participantsUpdate may arrive or be filtered by the server)
-            var ack = await ReceiveMessageOfType(ws1, "ack");
-            Assert.Equal("ready-op-1", ack.GetProperty("opId").GetString());
 
             // ws2 should receive participantsUpdate with readyCount = 1
             var update = await ReceiveParticipantsUpdate(ws2, expectedReadyCount: 1);
@@ -449,10 +438,6 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
             var split = bytes.Length / 2;
             await ws1.SendAsync(new ArraySegment<byte>(bytes, 0, split), WebSocketMessageType.Text, false, CancellationToken.None);
             await ws1.SendAsync(new ArraySegment<byte>(bytes, split, bytes.Length - split), WebSocketMessageType.Text, true, CancellationToken.None);
-
-            // ws1 should receive ack
-            var ack = await ReceiveMessageOfType(ws1, "ack");
-            Assert.Equal("op-frag-1", ack.GetProperty("opId").GetString());
 
             // ws2 should receive the cardOp
             var received = await ReceiveMessageOfType(ws2, "cardOp");

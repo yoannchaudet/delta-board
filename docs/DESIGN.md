@@ -22,7 +22,7 @@ This reduces merge complexity, but convergence still requires handling unreliabl
 Key properties:
 
 - Operations are idempotent via a unique `opId`
-- Senders retry operations until the server acknowledges receipt
+- Senders do not wait for acknowledgments; operations are eventually consistent
 - Card edits use a per card monotonically increasing `rev` so late operations cannot overwrite newer ones
 - Vote state converges with an LWW boolean per (cardId, voterId) using a monotonic rev
 

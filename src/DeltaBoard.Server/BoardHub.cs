@@ -325,8 +325,8 @@ public sealed class BoardHub
                 case "cardOp":
                 case "vote":
                 case "phaseChanged":
-                    // Ack the sender, then broadcast to others
-                    await AckAndBroadcast(board, senderId, doc.RootElement, message);
+                    // Broadcast to others
+                    await BroadcastMessage(board, senderId, message);
                     break;
 
                 default:
@@ -350,13 +350,6 @@ public sealed class BoardHub
         if (board.Participants.TryGetValue(clientId, out var participant))
         {
             participant.IsReady = ready;
-
-            // Send ack if opId is present
-            if (root.TryGetProperty("opId", out var opIdEl))
-            {
-                var ack = new { type = "ack", opId = opIdEl.GetString() };
-                await SendJson(participant.Socket, ack, clientId, CancellationToken.None);
-            }
 
             await BroadcastParticipantsUpdate(board, clientId);
         }
@@ -385,14 +378,6 @@ public sealed class BoardHub
 
     private async Task AckAndBroadcast(BoardState board, string senderId, JsonElement root, string message)
     {
-        // Send ack to sender if opId is present
-        if (root.TryGetProperty("opId", out var opIdEl) &&
-            board.Participants.TryGetValue(senderId, out var sender))
-        {
-            var ack = new { type = "ack", opId = opIdEl.GetString() };
-            await SendJson(sender.Socket, ack, senderId, CancellationToken.None);
-        }
-
         // Broadcast to all except sender
         await BroadcastMessage(board, senderId, message);
     }

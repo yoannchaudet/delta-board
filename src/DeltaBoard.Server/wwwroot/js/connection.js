@@ -16,7 +16,6 @@ const RECONNECT_MAX_DELAY_MS = 30000;
  * @property {(state: ConnectionState) => void} [onStateChange]
  * @property {(participantCount: number, readyCount: number) => void} [onParticipantsUpdate]
  * @property {(message: Object) => void} [onMessage]
- * @property {(opId: string) => void} [onAck]
  * @property {(error: string) => void} [onError]
  */
 
@@ -141,10 +140,6 @@ export function createConnection(boardId, callbacks = {}) {
 
                 case 'pong':
                     clearPongTimeout();
-                    break;
-
-                case 'ack':
-                    callbacks.onAck?.(message.opId);
                     break;
 
                 case 'error':
