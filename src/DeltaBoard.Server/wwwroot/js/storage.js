@@ -84,3 +84,45 @@ export function getClientId() {
     }
     return clientId;
 }
+
+/**
+ * Save board state to localStorage
+ * @param {string} boardId
+ * @param {import('./types.js').BoardState} state
+ */
+export function saveBoard(boardId, state) {
+    const key = `${BOARD_PREFIX}${boardId}`;
+    const data = {
+        ...state,
+        lastModified: Date.now()
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+}
+
+/**
+ * Load board state from localStorage
+ * @param {string} boardId
+ * @returns {import('./types.js').BoardState | null}
+ */
+export function loadBoard(boardId) {
+    const key = `${BOARD_PREFIX}${boardId}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const data = JSON.parse(raw);
+        // Validate basic structure
+        if (!data || typeof data.phase !== 'string' || !Array.isArray(data.cards) || !Array.isArray(data.votes)) {
+            return null;
+        }
+        return {
+            phase: data.phase,
+            cards: data.cards,
+            votes: data.votes
+        };
+    } catch {
+        return null;
+    }
+}

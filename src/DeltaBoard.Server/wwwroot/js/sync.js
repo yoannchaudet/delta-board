@@ -13,6 +13,7 @@ const SYNC_WINDOW_MS = 2000; // Wait 2 seconds for syncState messages
  * @typedef {Object} SyncCallbacks
  * @property {(state: BoardState) => void} onStateReady - Called when sync is complete
  * @property {(state: BoardState) => void} onBroadcastState - Called when we should broadcast our state
+ * @property {(ops: Array<Object>) => void} [onBufferedOps] - Called with buffered operations after sync
  */
 
 /**
@@ -112,10 +113,14 @@ export function createSyncManager(getLocalState, callbacks) {
             callbacks.onBroadcastState(finalState);
         }
 
-        // Return buffered ops to be applied
+        // Apply buffered operations
         const ops = bufferedOps;
         bufferedOps = [];
         receivedStates = [];
+
+        if (ops.length > 0) {
+            callbacks.onBufferedOps?.(ops);
+        }
 
         return ops;
     }

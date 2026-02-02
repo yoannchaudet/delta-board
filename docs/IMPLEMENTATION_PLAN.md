@@ -139,41 +139,45 @@ Implement merge rules from PROTOCOL.md:
 Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 
 **Tasks:**
-- [ ] `applyCardOp(state, op)` — handles create/edit/delete based on presence and rev
-- [ ] Local operations increment rev before broadcast
-- [ ] Remote operations use LWW merge
-- [ ] Tombstone deleted cards (don't remove from array)
-- [ ] Filter tombstones in UI queries: `getVisibleCards(state, column)`
+- [x] `applyCardOp(state, op)` — handles create/edit/delete based on presence and rev
+- [x] Local operations increment rev before broadcast
+- [x] Remote operations use LWW merge
+- [x] Tombstone deleted cards (don't remove from array)
+- [x] Filter tombstones in UI queries: `getVisibleCards(state, column)`
 
 ### 3.2 Vote Operations
 
 **File:** `wwwroot/js/operations.js`
 
 **Tasks:**
-- [ ] `applyVote(state, op)` — add or remove vote
-- [ ] Vote entity model: one entry per (cardId, voterId) pair
-- [ ] Tombstone removed votes
-- [ ] `getVoteCount(state, cardId)` — count non-deleted votes
-- [ ] `hasVoted(state, cardId, voterId)` — check vote exists and not deleted
+- [x] `applyVote(state, op)` — add or remove vote
+- [x] Vote entity model: one entry per (cardId, voterId) pair
+- [x] Tombstone removed votes
+- [x] `getVoteCount(state, cardId)` — count non-deleted votes
+- [x] `hasVoted(state, cardId, voterId)` — check vote exists and not deleted
 
 ### 3.3 Message Broadcasting
 
 **File:** `wwwroot/js/connection.js`
 
 **Tasks:**
-- [ ] `broadcast(message)` — add opId, send via WebSocket
-- [ ] Handle incoming messages by type: `cardOp`, `vote`, `syncState`, `participantsUpdate`, etc.
-- [ ] Route to appropriate handlers
+- [x] `broadcast(message)` — add opId, send via WebSocket
+- [x] Handle incoming messages by type: `cardOp`, `vote`, `syncState`, `participantsUpdate`, etc.
+- [x] Route to appropriate handlers
 
 ### 3.4 Board UI Wiring (Card Create)
 
 **File:** `wwwroot/js/app.js`
 
 **Tasks:**
-- [ ] Initialize local board state for the board page
-- [ ] Wire "+ Add Card" buttons to create local card ops and broadcast
-- [ ] Render cards from state (both columns)
-- [ ] Apply incoming `cardOp` messages to local state and re-render
+- [x] Initialize local board state for the board page
+- [x] Wire "+ Add Card" buttons to create local card ops and broadcast
+- [x] Render cards from state (both columns)
+- [x] Apply incoming `cardOp` messages to local state and re-render
+- [x] Load/save board state from localStorage (persistence)
+- [x] Integrate sync module for join-time state synchronization
+- [x] Integrate dedup module for operation deduplication
+- [x] Add edit/delete card UI (for own cards only)
 
 ---
 

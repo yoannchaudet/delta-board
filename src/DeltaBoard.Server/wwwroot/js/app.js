@@ -4,6 +4,9 @@ import { initLandingPage } from './landing.js';
 import { createConnection } from './connection.js';
 import { createEmptyState, createCard } from './types.js';
 import { applyCardOp, getVisibleCards, getVoteCount } from './operations.js';
+import { saveBoard, loadBoard } from './storage.js';
+import { createSyncManager } from './sync.js';
+import { createDedup } from './dedup.js';
 
 /**
  * Detect current page from URL
@@ -57,11 +60,46 @@ function initBoard(boardId) {
     const deltaCardsEl = document.getElementById('delta-cards');
     const addButtons = document.querySelectorAll('.btn-add');
 
-    let state = createEmptyState();
+    // Load persisted state or create empty
+    let state = loadBoard(boardId) || createEmptyState();
+
+    // Create deduplication tracker
+    const dedup = createDedup();
+
+    // Create sync manager
+    const syncManager = createSyncManager(
+        () => state,
+        {
+            onStateReady: (newState) => {
+                state = newState;
+                persistAndRender();
+            },
+            onBroadcastState: (stateToSend) => {
+                connection.send({
+                    type: 'syncState',
+                    state: stateToSend
+                });
+            },
+            onBufferedOps: (ops) => {
+                // Apply buffered operations after sync completes
+                for (const op of ops) {
+                    if (op.type === 'cardOp') {
+                        applyCardOpAndPersist(op);
+                    }
+                }
+            }
+        }
+    );
 
     const connection = createConnection(boardId, {
-        onStateChange: (state) => {
-            updateConnectionStatus(statusEl, state);
+        onStateChange: (connState) => {
+            updateConnectionStatus(statusEl, connState);
+            if (connState === 'ready') {
+                // Start sync window when connection becomes ready
+                syncManager.startSync();
+            } else if (connState === 'disconnected' || connState === 'closed') {
+                syncManager.cancel();
+            }
         },
 
         onParticipantsUpdate: (participantCount, readyCount) => {
@@ -70,11 +108,34 @@ function initBoard(boardId) {
         },
 
         onMessage: (message) => {
-            if (message.type === 'cardOp') {
-                handleCardOp(message);
-            } else {
-                console.log('Received:', message);
+            // Handle sync-related messages
+            if (message.type === 'syncState') {
+                syncManager.handleSyncState(message.state);
+                return;
             }
+
+            if (message.type === 'requestSync') {
+                // Another client wants our state
+                connection.send({
+                    type: 'syncState',
+                    state: state
+                });
+                return;
+            }
+
+            // For operations, check dedup and sync buffering
+            if (message.type === 'cardOp') {
+                if (message.opId && dedup.isDuplicate(message.opId)) {
+                    return; // Already processed
+                }
+                if (syncManager.handleOperation(message)) {
+                    return; // Buffered during sync
+                }
+                applyCardOpAndPersist(message);
+                return;
+            }
+
+            console.log('Received:', message);
         },
 
         onError: (error) => {
@@ -86,9 +147,14 @@ function initBoard(boardId) {
     // Start connection
     connection.connect();
 
-    // Store connection for debugging
+    // Store for debugging
     window._connection = connection;
+    window._state = () => state;
 
+    // Initial render
+    renderBoard();
+
+    // Wire up add card buttons
     addButtons.forEach(button => {
         button.addEventListener('click', () => {
             const column = button.dataset.column;
@@ -108,13 +174,20 @@ function initBoard(boardId) {
                 isDeleted: card.isDeleted
             };
 
-            handleCardOp(op);
-            connection.broadcast(op);
+            applyCardOpAndPersist(op);
+            const opId = connection.broadcast(op);
+            // Mark as seen after broadcast (broadcast adds the opId)
+            dedup.markSeen(opId);
         });
     });
 
-    function handleCardOp(op) {
+    function applyCardOpAndPersist(op) {
         state = applyCardOp(state, op);
+        persistAndRender();
+    }
+
+    function persistAndRender() {
+        saveBoard(boardId, state);
         renderBoard();
     }
 
@@ -134,6 +207,7 @@ function initBoard(boardId) {
     function renderCard(card) {
         const el = document.createElement('div');
         el.className = 'card';
+        el.dataset.cardId = card.id;
 
         const body = document.createElement('div');
         body.className = 'card-body';
@@ -146,10 +220,74 @@ function initBoard(boardId) {
         votes.className = 'card-votes';
         votes.textContent = String(getVoteCount(state, card.id));
 
+        // Card actions (edit/delete) - only for own cards
+        const isOwnCard = card.authorId === connection.getClientId();
+        if (isOwnCard) {
+            const actions = document.createElement('div');
+            actions.className = 'card-actions';
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn-card-action';
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleEditCard(card);
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-card-action btn-delete';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleDeleteCard(card);
+            });
+
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
+            body.appendChild(actions);
+        }
+
         body.appendChild(content);
         body.appendChild(votes);
         el.appendChild(body);
         return el;
+    }
+
+    function handleEditCard(card) {
+        const newText = window.prompt('Edit card text', card.text);
+        if (!newText || newText === card.text) return;
+
+        const op = {
+            type: 'cardOp',
+            cardId: card.id,
+            column: card.column,
+            text: newText,
+            authorId: card.authorId,
+            rev: card.rev + 1,
+            isDeleted: false
+        };
+
+        applyCardOpAndPersist(op);
+        const opId = connection.broadcast(op);
+        dedup.markSeen(opId);
+    }
+
+    function handleDeleteCard(card) {
+        if (!window.confirm('Delete this card?')) return;
+
+        const op = {
+            type: 'cardOp',
+            cardId: card.id,
+            column: card.column,
+            text: card.text,
+            authorId: card.authorId,
+            rev: card.rev + 1,
+            isDeleted: true
+        };
+
+        applyCardOpAndPersist(op);
+        const opId = connection.broadcast(op);
+        dedup.markSeen(opId);
     }
 }
 
