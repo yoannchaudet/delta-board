@@ -64,6 +64,9 @@ function initBoard(boardId) {
     const addWellBtn = document.getElementById('add-well-btn');
     const addDeltaBtn = document.getElementById('add-delta-btn');
 
+    // Editing state - null when creating new, card object when editing
+    let editingCard = null;
+
     // Load persisted state or create empty
     let state = loadBoard(boardId) || createEmptyState();
 
@@ -209,23 +212,44 @@ function initBoard(boardId) {
         const text = cardInputText.value.trim();
         if (!text) return;
 
-        const card = createCard(column, text, connection.getClientId());
-        const op = {
-            type: 'cardOp',
-            cardId: card.id,
-            column: card.column,
-            text: card.text,
-            authorId: card.authorId,
-            rev: card.rev,
-            isDeleted: card.isDeleted
-        };
+        let op;
+        if (editingCard) {
+            // Editing existing card
+            op = {
+                type: 'cardOp',
+                cardId: editingCard.id,
+                column: column,
+                text: text,
+                authorId: editingCard.authorId,
+                rev: editingCard.rev + 1,
+                isDeleted: false
+            };
+        } else {
+            // Creating new card
+            const card = createCard(column, text, connection.getClientId());
+            op = {
+                type: 'cardOp',
+                cardId: card.id,
+                column: card.column,
+                text: card.text,
+                authorId: card.authorId,
+                rev: card.rev,
+                isDeleted: card.isDeleted
+            };
+        }
 
         applyCardOpAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
 
-        // Clear input and refocus
+        // Clear editing state and input
+        clearEditingState();
+    }
+
+    function clearEditingState() {
+        editingCard = null;
         cardInputText.value = '';
+        cardInputText.classList.remove('editing-well', 'editing-delta');
         updateAddButtonStates();
         cardInputText.focus();
     }
@@ -233,8 +257,14 @@ function initBoard(boardId) {
     addWellBtn.addEventListener('click', () => submitCard('well'));
     addDeltaBtn.addEventListener('click', () => submitCard('delta'));
 
-    // Keyboard shortcuts: Ctrl+Enter for Well, Ctrl+Shift+Enter for Delta
+    // Keyboard shortcuts: Ctrl+Enter for Well, Ctrl+Shift+Enter for Delta, Escape to cancel
     cardInputText.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            clearEditingState();
+            cardInputText.blur();
+            return;
+        }
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             if (e.shiftKey) {
@@ -355,22 +385,25 @@ function initBoard(boardId) {
     }
 
     function handleEditCard(card) {
-        const newText = window.prompt('Edit card text', card.text);
-        if (!newText || newText === card.text) return;
+        // Set editing state
+        editingCard = card;
 
-        const op = {
-            type: 'cardOp',
-            cardId: card.id,
-            column: card.column,
-            text: newText,
-            authorId: card.authorId,
-            rev: card.rev + 1,
-            isDeleted: false
-        };
+        // Load card text into textarea
+        cardInputText.value = card.text;
 
-        applyCardOpAndPersist(op);
-        const opId = connection.broadcast(op);
-        dedup.markSeen(opId);
+        // Apply column-specific background
+        cardInputText.classList.remove('editing-well', 'editing-delta');
+        cardInputText.classList.add(card.column === 'well' ? 'editing-well' : 'editing-delta');
+
+        // Update button states
+        updateAddButtonStates();
+
+        // Focus and select all text
+        cardInputText.focus();
+        cardInputText.select();
+
+        // Scroll to input
+        cardInputText.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     function handleDeleteCard(card) {
