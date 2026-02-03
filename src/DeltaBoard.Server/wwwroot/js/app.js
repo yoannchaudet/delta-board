@@ -102,9 +102,18 @@ function initBoard(boardId) {
             }
         },
 
-        onParticipantsUpdate: (participantCount, readyCount) => {
+        onParticipantsUpdate: (participantCount, readyCount, syncForClientId) => {
             console.log(`Participants: ${participantCount}, Ready: ${readyCount}`);
             // TODO: Update UI with participant/ready counts
+
+            // If a new client joined, send them our state
+            if (syncForClientId) {
+                connection.send({
+                    type: 'syncState',
+                    targetClientId: syncForClientId,
+                    state: state
+                });
+            }
         },
 
         onMessage: (message) => {

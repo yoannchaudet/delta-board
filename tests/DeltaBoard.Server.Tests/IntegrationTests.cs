@@ -317,6 +317,67 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task WebSocket_NewClientJoin_TriggersParticipantsUpdateWithSyncForClientId()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"sync-notify-test-{Guid.NewGuid():N}";
+
+        var ws1 = await ConnectAndHandshake(wsClient, boardId, "client-1");
+
+        try
+        {
+            // Act - Connect second client
+            var ws2 = await ConnectAndHandshake(wsClient, boardId, "client-2");
+
+            // ws1 should receive participantsUpdate with syncForClientId = "client-2"
+            var update = await ReceiveMessageOfType(ws1, "participantsUpdate");
+
+            // Assert
+            Assert.Equal(2, update.GetProperty("participantCount").GetInt32());
+            Assert.True(update.TryGetProperty("syncForClientId", out var syncForEl));
+            Assert.Equal("client-2", syncForEl.GetString());
+
+            await ws2.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+        }
+        finally
+        {
+            await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task WebSocket_ClientLeave_ParticipantsUpdateHasNoSyncForClientId()
+    {
+        // Arrange
+        var wsClient = _factory.Server.CreateWebSocketClient();
+        var boardId = $"leave-test-{Guid.NewGuid():N}";
+
+        var ws1 = await ConnectAndHandshake(wsClient, boardId, "client-1");
+        var ws2 = await ConnectAndHandshake(wsClient, boardId, "client-2");
+
+        // Consume the join participantsUpdate on ws1
+        await ReceiveMessageOfType(ws1, "participantsUpdate");
+
+        try
+        {
+            // Act - ws2 leaves
+            await ws2.CloseAsync(WebSocketCloseStatus.NormalClosure, "Leaving", CancellationToken.None);
+
+            // ws1 should receive participantsUpdate WITHOUT syncForClientId
+            var update = await ReceiveMessageOfType(ws1, "participantsUpdate");
+
+            // Assert
+            Assert.Equal(1, update.GetProperty("participantCount").GetInt32());
+            Assert.False(update.TryGetProperty("syncForClientId", out _));
+        }
+        finally
+        {
+            await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task WebSocket_PingPong()
     {
         // Arrange

@@ -67,7 +67,8 @@ public sealed class BoardHub
             _logger.LogInformation("ws-welcome-sent {ConnectionId} {BoardId} {ClientId}", connectionId, boardId, clientId);
 
             // Notify existing participants (exclude the joiner; they already got welcome)
-            await BroadcastParticipantsUpdate(board, clientId);
+            // Include syncForClientId so existing clients send their state to the new joiner
+            await BroadcastParticipantsUpdate(board, excludeClientId: clientId, syncForClientId: clientId);
 
             // Main message loop
             await ReceiveMessages(board, clientId, webSocket, cancellationToken);
@@ -85,7 +86,7 @@ public sealed class BoardHub
         finally
         {
             board.Participants.TryRemove(clientId, out _);
-            await BroadcastParticipantsUpdate(board, clientId);
+            await BroadcastParticipantsUpdate(board, excludeClientId: clientId, syncForClientId: null);
             _logger.LogInformation("ws-closed {ConnectionId} {BoardId} {ClientId} {State} {CloseStatus}",
                 connectionId,
                 boardId,
@@ -351,7 +352,8 @@ public sealed class BoardHub
         {
             participant.IsReady = ready;
 
-            await BroadcastParticipantsUpdate(board, clientId);
+            // Don't exclude anyone for ready updates - everyone should see it including the sender
+            await BroadcastParticipantsUpdate(board, excludeClientId: null, syncForClientId: null);
         }
     }
 
@@ -392,14 +394,22 @@ public sealed class BoardHub
         await webSocket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
     }
 
-    private async Task BroadcastParticipantsUpdate(BoardState board, string? excludeClientId)
+    private async Task BroadcastParticipantsUpdate(BoardState board, string? excludeClientId, string? syncForClientId)
     {
-        var update = new
-        {
-            type = "participantsUpdate",
-            participantCount = board.Participants.Count,
-            readyCount = board.Participants.Values.Count(p => p.IsReady)
-        };
+        object update = syncForClientId is not null
+            ? new
+            {
+                type = "participantsUpdate",
+                participantCount = board.Participants.Count,
+                readyCount = board.Participants.Values.Count(p => p.IsReady),
+                syncForClientId
+            }
+            : new
+            {
+                type = "participantsUpdate",
+                participantCount = board.Participants.Count,
+                readyCount = board.Participants.Values.Count(p => p.IsReady)
+            };
 
         var json = JsonSerializer.Serialize(update);
 

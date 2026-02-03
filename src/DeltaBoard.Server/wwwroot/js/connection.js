@@ -14,7 +14,7 @@ const RECONNECT_MAX_DELAY_MS = 30000;
 /**
  * @typedef {Object} ConnectionCallbacks
  * @property {(state: ConnectionState) => void} [onStateChange]
- * @property {(participantCount: number, readyCount: number) => void} [onParticipantsUpdate]
+ * @property {(participantCount: number, readyCount: number, syncForClientId?: string) => void} [onParticipantsUpdate]
  * @property {(message: Object) => void} [onMessage]
  * @property {(error: string) => void} [onError]
  */
@@ -135,7 +135,7 @@ export function createConnection(boardId, callbacks = {}) {
                 case 'participantsUpdate':
                     participantCount = message.participantCount;
                     readyCount = message.readyCount;
-                    callbacks.onParticipantsUpdate?.(participantCount, readyCount);
+                    callbacks.onParticipantsUpdate?.(participantCount, readyCount, message.syncForClientId);
                     break;
 
                 case 'pong':
