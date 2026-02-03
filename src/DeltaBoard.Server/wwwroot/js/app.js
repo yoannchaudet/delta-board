@@ -3,7 +3,7 @@
 import { initLandingPage } from './landing.js';
 import { createConnection } from './connection.js';
 import { createEmptyState, createCard } from './types.js';
-import { applyCardOp, getVisibleCards, getVoteCount } from './operations.js';
+import { applyCardOp, applyVote, getVisibleCards, getVoteCount, hasVoted } from './operations.js';
 import { saveBoard, loadBoard } from './storage.js';
 import { createSyncManager } from './sync.js';
 import { createDedup } from './dedup.js';
@@ -85,6 +85,8 @@ function initBoard(boardId) {
                 for (const op of ops) {
                     if (op.type === 'cardOp') {
                         applyCardOpAndPersist(op);
+                    } else if (op.type === 'vote') {
+                        applyVoteAndPersist(op);
                     }
                 }
             }
@@ -144,6 +146,17 @@ function initBoard(boardId) {
                 return;
             }
 
+            if (message.type === 'vote') {
+                if (message.opId && dedup.isDuplicate(message.opId)) {
+                    return; // Already processed
+                }
+                if (syncManager.handleOperation(message)) {
+                    return; // Buffered during sync
+                }
+                applyVoteAndPersist(message);
+                return;
+            }
+
             console.log('Received:', message);
         },
 
@@ -195,6 +208,11 @@ function initBoard(boardId) {
         persistAndRender();
     }
 
+    function applyVoteAndPersist(op) {
+        state = applyVote(state, op);
+        persistAndRender();
+    }
+
     function persistAndRender() {
         saveBoard(boardId, state);
         renderBoard();
@@ -218,6 +236,7 @@ function initBoard(boardId) {
         el.className = 'card';
         el.dataset.cardId = card.id;
 
+        // Card body with content and vote button
         const body = document.createElement('div');
         body.className = 'card-body';
 
@@ -225,12 +244,25 @@ function initBoard(boardId) {
         content.className = 'card-content';
         content.textContent = card.text;
 
-        const votes = document.createElement('div');
-        votes.className = 'card-votes';
-        votes.textContent = String(getVoteCount(state, card.id));
+        const clientId = connection.getClientId();
+        const voted = hasVoted(state, card.id, clientId);
+        const voteCount = getVoteCount(state, card.id);
 
-        // Card actions (edit/delete) - only for own cards
-        const isOwnCard = card.authorId === connection.getClientId();
+        const voteBtn = document.createElement('button');
+        voteBtn.className = 'card-votes' + (voted ? ' voted' : '');
+        voteBtn.textContent = String(voteCount);
+        voteBtn.title = voted ? 'Remove vote' : 'Vote';
+        voteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleVote(card, voted);
+        });
+
+        body.appendChild(content);
+        body.appendChild(voteBtn);
+        el.appendChild(body);
+
+        // Card actions (edit/delete) at bottom - only for own cards
+        const isOwnCard = card.authorId === clientId;
         if (isOwnCard) {
             const actions = document.createElement('div');
             actions.className = 'card-actions';
@@ -253,13 +285,31 @@ function initBoard(boardId) {
 
             actions.appendChild(editBtn);
             actions.appendChild(deleteBtn);
-            body.appendChild(actions);
+            el.appendChild(actions);
         }
 
-        body.appendChild(content);
-        body.appendChild(votes);
-        el.appendChild(body);
         return el;
+    }
+
+    function handleVote(card, currentlyVoted) {
+        const clientId = connection.getClientId();
+
+        // Find existing vote to get current rev
+        const voteId = `${card.id}:${clientId}`;
+        const existingVote = state.votes.find(v => v.id === voteId);
+        const currentRev = existingVote ? existingVote.rev : 0;
+
+        const op = {
+            type: 'vote',
+            cardId: card.id,
+            voterId: clientId,
+            rev: currentRev + 1,
+            isDeleted: currentlyVoted // Toggle: if voted, now remove; if not voted, add
+        };
+
+        applyVoteAndPersist(op);
+        const opId = connection.broadcast(op);
+        dedup.markSeen(opId);
     }
 
     function handleEditCard(card) {
