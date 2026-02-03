@@ -39,10 +39,23 @@
     </main>
 
     <main id="board-page" class="board" style="display: none;">
+        <section class="card-input">
+            <textarea id="card-input-text" class="card-input-textarea" placeholder="Type your thought..." rows="2"></textarea>
+            <div class="card-input-buttons">
+                <button id="add-well-btn" class="btn btn-add-well" data-column="well">
+                    Add to Went Well
+                    <span class="shortcut-hint">Ctrl+Enter</span>
+                </button>
+                <button id="add-delta-btn" class="btn btn-add-delta" data-column="delta">
+                    Add to Delta
+                    <span class="shortcut-hint">Ctrl+Shift+Enter</span>
+                </button>
+            </div>
+        </section>
+
         <section class="column" data-column="well">
             <div class="column-header">
                 <h2>What Went Well</h2>
-                <button class="btn btn-add" data-column="well">+ Add Card</button>
             </div>
             <div class="cards" id="well-cards"></div>
         </section>
@@ -50,7 +63,6 @@
         <section class="column" data-column="delta">
             <div class="column-header">
                 <h2>Delta</h2>
-                <button class="btn btn-add" data-column="delta">+ Add Card</button>
             </div>
             <div class="cards" id="delta-cards"></div>
         </section>

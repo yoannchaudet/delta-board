@@ -58,7 +58,11 @@ function initBoard(boardId) {
     const statusEl = document.getElementById('connection-status');
     const wellCardsEl = document.getElementById('well-cards');
     const deltaCardsEl = document.getElementById('delta-cards');
-    const addButtons = document.querySelectorAll('.btn-add');
+
+    // Card input elements
+    const cardInputText = document.getElementById('card-input-text');
+    const addWellBtn = document.getElementById('add-well-btn');
+    const addDeltaBtn = document.getElementById('add-delta-btn');
 
     // Load persisted state or create empty
     let state = loadBoard(boardId) || createEmptyState();
@@ -176,31 +180,69 @@ function initBoard(boardId) {
     // Initial render
     renderBoard();
 
-    // Wire up add card buttons
-    addButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const column = button.dataset.column;
-            if (!column) return;
+    // Card input: update button states based on textarea content
+    function updateAddButtonStates() {
+        const hasText = cardInputText.value.trim().length > 0;
+        addWellBtn.disabled = !hasText;
+        addDeltaBtn.disabled = !hasText;
+    }
 
-            const text = window.prompt('Card text');
-            if (!text) return;
+    cardInputText.addEventListener('input', updateAddButtonStates);
+    updateAddButtonStates(); // Initial state
 
-            const card = createCard(column, text, connection.getClientId());
-            const op = {
-                type: 'cardOp',
-                cardId: card.id,
-                column: card.column,
-                text: card.text,
-                authorId: card.authorId,
-                rev: card.rev,
-                isDeleted: card.isDeleted
-            };
+    // Card input: color feedback on button hover
+    addWellBtn.addEventListener('mouseenter', () => {
+        cardInputText.classList.add('aim-well');
+    });
+    addWellBtn.addEventListener('mouseleave', () => {
+        cardInputText.classList.remove('aim-well');
+    });
+    addDeltaBtn.addEventListener('mouseenter', () => {
+        cardInputText.classList.add('aim-delta');
+    });
+    addDeltaBtn.addEventListener('mouseleave', () => {
+        cardInputText.classList.remove('aim-delta');
+    });
 
-            applyCardOpAndPersist(op);
-            const opId = connection.broadcast(op);
-            // Mark as seen after broadcast (broadcast adds the opId)
-            dedup.markSeen(opId);
-        });
+    // Card input: submit handlers
+    function submitCard(column) {
+        const text = cardInputText.value.trim();
+        if (!text) return;
+
+        const card = createCard(column, text, connection.getClientId());
+        const op = {
+            type: 'cardOp',
+            cardId: card.id,
+            column: card.column,
+            text: card.text,
+            authorId: card.authorId,
+            rev: card.rev,
+            isDeleted: card.isDeleted
+        };
+
+        applyCardOpAndPersist(op);
+        const opId = connection.broadcast(op);
+        dedup.markSeen(opId);
+
+        // Clear input and refocus
+        cardInputText.value = '';
+        updateAddButtonStates();
+        cardInputText.focus();
+    }
+
+    addWellBtn.addEventListener('click', () => submitCard('well'));
+    addDeltaBtn.addEventListener('click', () => submitCard('delta'));
+
+    // Keyboard shortcuts: Ctrl+Enter for Well, Ctrl+Shift+Enter for Delta
+    cardInputText.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (e.shiftKey) {
+                submitCard('delta');
+            } else {
+                submitCard('well');
+            }
+        }
     });
 
     function applyCardOpAndPersist(op) {

@@ -151,6 +151,98 @@ header h1 {
     margin: 0 auto;
 }
 
+/* Card Input Section */
+.card-input {
+    grid-column: 1 / -1;
+    background-color: var(--color-white);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.card-input-textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    font-family: inherit;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius);
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.card-input-textarea:focus {
+    outline: none;
+    border-color: var(--color-text-light);
+}
+
+.card-input-textarea.aim-well {
+    border-color: var(--color-well);
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+.card-input-textarea.aim-delta {
+    border-color: var(--color-delta);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+.card-input-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+
+.btn-add-well,
+.btn-add-delta {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s, opacity 0.2s;
+}
+
+.btn-add-well {
+    background-color: var(--color-well);
+    color: white;
+}
+
+.btn-add-well:hover {
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-add-delta {
+    background-color: var(--color-delta);
+    color: white;
+}
+
+.btn-add-delta:hover {
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-add-well:disabled,
+.btn-add-delta:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.shortcut-hint {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    font-weight: 400;
+}
+
 .column {
     background-color: var(--color-white);
     border-radius: var(--radius);
@@ -173,7 +265,6 @@ header h1 {
 .column-header h2 {
     font-size: 1.25rem;
     font-weight: 600;
-    margin-bottom: 1rem;
 }
 
 .cards {
@@ -506,6 +597,15 @@ footer a:hover {
         grid-template-columns: 1fr;
         padding: 1rem;
         gap: 1rem;
+    }
+
+    .card-input-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .shortcut-hint {
+        display: none;
     }
 
     .landing {
