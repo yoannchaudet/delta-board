@@ -117,7 +117,7 @@ Implement merge rules from PROTOCOL.md:
 - [x] Buffer incoming `cardOp`/`vote` messages during sync window (1-2s)
 - [x] Collect `syncState` messages, merge them all
 - [x] After sync window: apply buffered operations
-- [x] If local state changed from merge: broadcast `syncState` once
+- [x] After join-time merge window completes: broadcast `syncState` once
 
 ### 2.3 opId Deduplication
 

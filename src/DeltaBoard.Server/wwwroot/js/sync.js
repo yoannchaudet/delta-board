@@ -94,24 +94,17 @@ export function createSyncManager(getLocalState, callbacks) {
 
         // Start with local state or empty
         let finalState = getLocalState() || createEmptyState();
-        let changed = false;
-
         // Merge all received states
         for (const remoteState of receivedStates) {
             const result = mergeState(finalState, remoteState);
             finalState = result.state;
-            if (result.changed) {
-                changed = true;
-            }
         }
 
         // Notify that state is ready
         callbacks.onStateReady(finalState);
 
-        // If state changed from merge, broadcast our merged state
-        if (changed && receivedStates.length > 0) {
-            callbacks.onBroadcastState(finalState);
-        }
+        // Broadcast our merged state once after the join window completes
+        callbacks.onBroadcastState(finalState);
 
         // Apply buffered operations
         const ops = bufferedOps;

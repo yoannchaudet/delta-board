@@ -437,7 +437,7 @@ Phase is monotonic: `reviewing` overrides `forming` whenever states are merged.
 Clients may receive multiple `syncState` responses when joining.
 For a stable initial view, clients should wait a short join window (for example, 1-2 seconds) to collect snapshots before using the board.
 If no `syncState` arrives in that window, proceed with local state and continue listening for later snapshots.
-If the local state changes as a result of the join-time merge, the client should proactively broadcast its merged `syncState` once.
+After the join-time merge window completes, the client should proactively broadcast its merged `syncState` once, even if the local state did not change.
 If no client with intact local state reconnects, the board state cannot be recovered.
 
 ## Phase Enforcement
@@ -466,7 +466,7 @@ Clients must validate outgoing and incoming operations:
 - For votes: clients set `rev = (max rev seen for that (cardId, voterId)) + 1` when adding or removing.
 - Clients SHOULD persist current card/vote `rev` values as part of local state so reloads do not reset counters.
 - On join, clients SHOULD buffer incoming operations while collecting `syncState`, then apply buffered ops after the join-time merge completes.
-- `syncState` SHOULD be targeted using `targetClientId`. Broadcasting a `syncState` (omitting `targetClientId`) should only be done once after a join-time merge that changed local state.
+- `syncState` SHOULD be targeted using `targetClientId`. Broadcasting a `syncState` (omitting `targetClientId`) should only be done once after the join-time merge window completes.
 
 ## Client Identity
 
