@@ -66,6 +66,7 @@ function initBoard(boardId) {
     const cardInputBar = document.getElementById('card-input-bar');
     const cardInputBarLabel = document.getElementById('card-input-bar-label');
     const cardInputCancel = document.getElementById('card-input-cancel');
+    const editOverlay = document.getElementById('edit-overlay');
     const wellBtnLabel = document.getElementById('well-btn-label');
     const deltaBtnLabel = document.getElementById('delta-btn-label');
 
@@ -263,12 +264,18 @@ function initBoard(boardId) {
         cardInputBar.classList.remove('editing-well', 'editing-delta');
         cardInputBarLabel.textContent = 'Add card';
         cardInputCancel.style.display = 'none';
+        editOverlay.classList.remove('active');
         wellBtnLabel.textContent = 'Add to Went Well';
         deltaBtnLabel.textContent = 'Add to Delta';
         updateAddButtonStates();
     }
 
     cardInputCancel.addEventListener('click', () => {
+        clearEditingState();
+        cardInputText.blur();
+    });
+
+    editOverlay.addEventListener('click', () => {
         clearEditingState();
         cardInputText.blur();
     });
@@ -418,13 +425,16 @@ function initBoard(boardId) {
         cardInputBar.classList.add(editClass);
 
         // Update bar and buttons
-        cardInputBarLabel.textContent = 'Edit card';
+        cardInputBarLabel.textContent = card.column === 'well' ? 'Editing \u00b7 What Went Well' : 'Editing \u00b7 Delta';
         cardInputCancel.style.display = '';
         wellBtnLabel.textContent = 'Save to Went Well';
         deltaBtnLabel.textContent = 'Save to Delta';
 
         // Update button states
         updateAddButtonStates();
+
+        // Show overlay
+        editOverlay.classList.add('active');
 
         // Focus and select all text
         cardInputText.focus();
