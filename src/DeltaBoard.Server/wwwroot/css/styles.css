@@ -90,6 +90,25 @@ header h1 {
     gap: 1rem;
 }
 
+.participant-count {
+    font-size: 0.8rem;
+    color: var(--color-text-light);
+    white-space: nowrap;
+}
+
+.participant-number {
+    display: inline-block;
+}
+
+.participant-number.tick {
+    animation: tick 0.3s ease-out;
+}
+
+@keyframes tick {
+    0%   { opacity: 0.4; transform: translateY(-3px); }
+    100% { opacity: 1;   transform: translateY(0); }
+}
+
 .status-indicator {
     width: 14px;
     height: 14px;
@@ -641,23 +660,12 @@ header h1 {
 }
 
 .board-card-delete {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--color-text-light);
-    font-size: 1.25rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
     opacity: 0;
-    transition: opacity 0.2s, color 0.2s;
+    transition: opacity 0.2s;
 }
 
 .board-card:hover .board-card-delete {
     opacity: 1;
-}
-
-.board-card-delete:hover {
-    color: var(--color-error);
 }
 
 /* Footer */

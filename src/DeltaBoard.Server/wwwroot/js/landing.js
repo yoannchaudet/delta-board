@@ -71,7 +71,7 @@ function createBoardCard(board) {
                 <span>${dateText}</span>
             </div>
         </div>
-        <button class="board-card-delete" title="Delete board">×</button>
+        <button class="btn-card-action btn-delete board-card-delete" title="Delete board">Delete</button>
     `;
 
     // Prevent navigation when clicking delete button

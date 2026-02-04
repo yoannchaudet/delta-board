@@ -119,7 +119,7 @@ function initBoard(boardId) {
 
         onParticipantsUpdate: (participantCount, readyCount, syncForClientId) => {
             console.log(`Participants: ${participantCount}, Ready: ${readyCount}`);
-            // TODO: Update UI with participant/ready counts
+            updateParticipantCount(participantCount);
 
             // If a new client joined, send them our state
             if (syncForClientId) {
@@ -464,6 +464,28 @@ function initBoard(boardId) {
 }
 
 /**
+ * Update participant count display
+ * @param {number} count
+ */
+function updateParticipantCount(count) {
+    const el = document.getElementById('participant-count');
+    const numEl = document.getElementById('participant-number');
+    if (count > 0) {
+        // Animate only when the number actually changes
+        if (numEl.textContent !== String(count)) {
+            numEl.textContent = count;
+            numEl.classList.remove('tick');
+            // Force reflow so re-adding the class restarts the animation
+            void numEl.offsetWidth;
+            numEl.classList.add('tick');
+        }
+        el.style.display = '';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+/**
  * Update connection status indicator
  * @param {HTMLElement} el
  * @param {string} state
@@ -492,6 +514,11 @@ function updateConnectionStatus(el, state) {
     // Show reconnect button only when permanently disconnected
     const reconnectBtn = document.getElementById('reconnect-btn');
     reconnectBtn.style.display = state === 'closed' ? '' : 'none';
+
+    // Hide participant count when disconnected
+    if (state === 'closed') {
+        updateParticipantCount(0);
+    }
 }
 
 // Initialize when DOM is ready
