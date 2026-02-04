@@ -63,6 +63,11 @@ function initBoard(boardId) {
     const cardInputText = document.getElementById('card-input-text');
     const addWellBtn = document.getElementById('add-well-btn');
     const addDeltaBtn = document.getElementById('add-delta-btn');
+    const cardInputBar = document.getElementById('card-input-bar');
+    const cardInputBarLabel = document.getElementById('card-input-bar-label');
+    const cardInputCancel = document.getElementById('card-input-cancel');
+    const wellBtnLabel = document.getElementById('well-btn-label');
+    const deltaBtnLabel = document.getElementById('delta-btn-label');
 
     // Editing state - null when creating new, card object when editing
     let editingCard = null;
@@ -250,9 +255,18 @@ function initBoard(boardId) {
         editingCard = null;
         cardInputText.value = '';
         cardInputText.classList.remove('editing-well', 'editing-delta');
+        cardInputBar.classList.remove('editing-well', 'editing-delta');
+        cardInputBarLabel.textContent = 'Add card';
+        cardInputCancel.style.display = 'none';
+        wellBtnLabel.textContent = 'Add to Went Well';
+        deltaBtnLabel.textContent = 'Add to Delta';
         updateAddButtonStates();
-        cardInputText.focus();
     }
+
+    cardInputCancel.addEventListener('click', () => {
+        clearEditingState();
+        cardInputText.blur();
+    });
 
     addWellBtn.addEventListener('click', () => submitCard('well'));
     addDeltaBtn.addEventListener('click', () => submitCard('delta'));
@@ -391,9 +405,18 @@ function initBoard(boardId) {
         // Load card text into textarea
         cardInputText.value = card.text;
 
-        // Apply column-specific background
+        // Apply column-specific styling
+        const editClass = card.column === 'well' ? 'editing-well' : 'editing-delta';
         cardInputText.classList.remove('editing-well', 'editing-delta');
-        cardInputText.classList.add(card.column === 'well' ? 'editing-well' : 'editing-delta');
+        cardInputText.classList.add(editClass);
+        cardInputBar.classList.remove('editing-well', 'editing-delta');
+        cardInputBar.classList.add(editClass);
+
+        // Update bar and buttons
+        cardInputBarLabel.textContent = 'Edit card';
+        cardInputCancel.style.display = '';
+        wellBtnLabel.textContent = 'Save to Went Well';
+        deltaBtnLabel.textContent = 'Save to Delta';
 
         // Update button states
         updateAddButtonStates();
