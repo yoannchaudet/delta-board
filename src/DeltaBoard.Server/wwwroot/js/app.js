@@ -35,8 +35,8 @@ function init() {
     if (page === 'landing') {
         document.getElementById('landing-page').style.display = 'block';
         document.getElementById('board-page').style.display = 'none';
-        document.getElementById('export-btn').style.display = 'none';
         document.getElementById('connection-status').style.display = 'none';
+        document.getElementById('reconnect-btn').style.display = 'none';
         initLandingPage();
     } else {
         document.getElementById('landing-page').style.display = 'none';
@@ -180,6 +180,11 @@ function initBoard(boardId) {
 
     // Start connection
     connection.connect();
+
+    // Reconnect button
+    document.getElementById('reconnect-btn').addEventListener('click', () => {
+        connection.reconnect();
+    });
 
     // Store for debugging
     window._connection = connection;
@@ -454,24 +459,29 @@ function initBoard(boardId) {
  * @param {string} state
  */
 function updateConnectionStatus(el, state) {
-    const labels = {
-        disconnected: 'Disconnected',
-        connecting: 'Connecting...',
-        handshaking: 'Connecting...',
-        ready: 'Connected',
+    const tooltips = {
+        disconnected: 'Reconnecting',
+        connecting: 'Reconnecting',
+        handshaking: 'Reconnecting',
+        ready: 'Connected and syncing changes',
         closed: 'Disconnected'
     };
 
     const classes = {
-        disconnected: 'status-indicator disconnected',
+        disconnected: 'status-indicator connecting',
         connecting: 'status-indicator connecting',
         handshaking: 'status-indicator connecting',
         ready: 'status-indicator connected',
         closed: 'status-indicator disconnected'
     };
 
-    el.textContent = labels[state] || state;
+    el.textContent = '';
     el.className = classes[state] || 'status-indicator';
+    el.title = tooltips[state] || '';
+
+    // Show reconnect button only when permanently disconnected
+    const reconnectBtn = document.getElementById('reconnect-btn');
+    reconnectBtn.style.display = state === 'closed' ? '' : 'none';
 }
 
 // Initialize when DOM is ready

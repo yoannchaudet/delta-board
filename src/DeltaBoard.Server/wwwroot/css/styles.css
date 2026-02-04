@@ -91,11 +91,12 @@ header h1 {
 }
 
 .status-indicator {
-    width: 10px;
-    height: 10px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background-color: var(--color-border);
     cursor: help;
+    flex-shrink: 0;
 }
 
 .status-indicator.connected {
@@ -108,6 +109,28 @@ header h1 {
 
 .status-indicator.connecting {
     background-color: var(--color-delta);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.btn-reconnect {
+    padding: 0.3rem 0.75rem;
+    border: none;
+    border-radius: var(--radius);
+    background-color: var(--color-error);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.btn-reconnect:hover {
+    opacity: 0.85;
 }
 
 .btn {

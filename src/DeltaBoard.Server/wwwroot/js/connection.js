@@ -4,8 +4,8 @@ import { getClientId } from './storage.js';
 
 const PING_INTERVAL_MS = 10000;
 const PONG_TIMEOUT_MS = 12000;
-const RECONNECT_MAX_ATTEMPTS = 10;
-const RECONNECT_MAX_DELAY_MS = 30000;
+const RECONNECT_MAX_ATTEMPTS = 6;
+const RECONNECT_MAX_DELAY_MS = 10000;
 
 /**
  * @typedef {'disconnected' | 'connecting' | 'handshaking' | 'ready' | 'closed'} ConnectionState
@@ -264,9 +264,15 @@ export function createConnection(boardId, callbacks = {}) {
         return didSend ? message.opId : null;
     }
 
+    function reconnect() {
+        reconnectAttempts = 0;
+        connect();
+    }
+
     // Public API
     return {
         connect,
+        reconnect,
         disconnect,
         send,
         broadcast,
