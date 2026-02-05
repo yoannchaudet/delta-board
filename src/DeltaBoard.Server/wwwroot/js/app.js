@@ -257,6 +257,9 @@ function initBoard(boardId) {
         // Hide ready count from presence
         document.getElementById('ready-count').innerHTML = '';
 
+        // Show phase chip
+        document.getElementById('phase-chip').style.display = '';
+
         renderBoard();
     }
 
@@ -558,6 +561,22 @@ function initBoard(boardId) {
         applyCardOpAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
+
+        // Delete all votes on this card
+        for (const vote of state.votes) {
+            if (vote.cardId === card.id && !vote.isDeleted) {
+                const voteOp = {
+                    type: 'vote',
+                    cardId: vote.cardId,
+                    voterId: vote.voterId,
+                    rev: vote.rev + 1,
+                    isDeleted: true
+                };
+                applyVoteAndPersist(voteOp);
+                const voteOpId = connection.broadcast(voteOp);
+                dedup.markSeen(voteOpId);
+            }
+        }
     }
 }
 

@@ -34,9 +34,16 @@ export function getAllBoards() {
                 lastModified = Math.max(...data.cards.map(c => c.createdAt || 0));
             }
 
+            const cardCount = data.cards.filter(c => !c.isDeleted).length;
+            const voteCount = Array.isArray(data.votes)
+                ? data.votes.filter(v => !v.isDeleted).length
+                : 0;
+
             boards.push({
                 id: boardId,
-                cardCount: data.cards.length,
+                cardCount,
+                voteCount,
+                phase: data.phase || 'forming',
                 lastModified
             });
         } catch {

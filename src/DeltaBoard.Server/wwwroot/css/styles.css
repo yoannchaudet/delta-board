@@ -103,6 +103,16 @@ header {
     line-height: 1.2;
 }
 
+.phase-chip {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--color-text-light);
+    background-color: var(--color-border);
+    padding: 0.15rem 0.5rem;
+    border-radius: 100px;
+    letter-spacing: 0.02em;
+}
+
 .landing-title {
     font-size: 1.5rem;
     font-weight: 600;
@@ -771,11 +781,13 @@ button.card-votes:active {
     border-radius: var(--radius);
     text-decoration: none;
     color: inherit;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
 .board-card:hover {
-    background-color: var(--color-border);
+    background-color: var(--color-bg-accent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
 }
 
 .board-card-content {
@@ -786,6 +798,9 @@ button.card-votes:active {
     font-size: 1rem;
     font-weight: 500;
     margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .board-card-meta {
