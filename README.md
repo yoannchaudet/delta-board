@@ -75,6 +75,14 @@ npm install
 npm test
 ```
 
+## CI
+
+GitHub Actions runs on every push to `main` and on pull requests:
+
+- Build the .NET server
+- Run .NET server tests (xUnit)
+- Run JavaScript client tests (Vitest)
+
 ## Documentation
 
 See [docs/DESIGN.md](docs/DESIGN.md) for detailed technical design and architecture.
