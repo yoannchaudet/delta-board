@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - Delta Board</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/css/shared.css">
+    <style>
+        .error-page {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .error-container {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            max-width: 500px;
+        }
+
+        .error-image {
+            width: 100px;
+            height: auto;
+            flex-shrink: 0;
+        }
+
+        .error-text h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--color-brown);
+            margin-bottom: 0.5rem;
+        }
+
+        .error-text p {
+            color: var(--color-text-light);
+            margin-bottom: 1rem;
+        }
+
+        .error-text a {
+            color: var(--color-brown);
+            font-weight: 500;
+            text-decoration: underline;
+        }
+
+        .error-text a:hover {
+            color: var(--color-text);
+        }
+
+        @media (max-width: 480px) {
+            .error-container {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .error-image {
+                width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="error-page">
+        <div class="error-container">
+            <img src="/images/sad-delta.svg" alt="Sad delta" class="error-image">
+            <div class="error-text">
+                <h1>We looked everywhere.</h1>
+                <p>No board lives at this URL.</p>
+                <a href="/">Back to boards</a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 <a href="https://mavensoul.studio" target="_blank" rel="noopener">Maven Soul Studio</a>. <a href="https://github.com/yoannchaudet/delta-board" target="_blank" rel="noopener">Code</a> licensed under the <a href="https://github.com/yoannchaudet/delta-board/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>.</p>
+    </footer>
+</body>
+</html>

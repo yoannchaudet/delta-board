@@ -51,6 +51,7 @@ Boards use human-readable URLs with collision-resistant hashing:
 
 - **Board route**: `/board/{id}` - serves the SPA for a specific board
 - **WebSocket**: `/board/{id}/ws` - real-time collaboration endpoint
+- **Fallback**: Any unmatched route returns a server-rendered 404 page
 - **Board ID format**: `{adjective}-{noun}-{hash}` (e.g., `cosmic-waffle-x7k2`)
 - **Total combinations**: 20 adjectives × 20 nouns × 36⁴ = 671,846,400 unique boards
 

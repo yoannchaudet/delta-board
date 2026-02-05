@@ -5,6 +5,7 @@ This plan implements the redesigned protocol (PROTOCOL.md) and lifecycle (LIFE_C
 ## Scope
 
 **In scope:**
+
 - Board WebSocket connection and messaging
 - State management and synchronization
 - Conflict resolution (LWW with revisions)
@@ -12,6 +13,7 @@ This plan implements the redesigned protocol (PROTOCOL.md) and lifecycle (LIFE_C
 - Presence and readiness
 
 **Out of scope:**
+
 - Landing page / board list (already working)
 - Visual design changes
 
@@ -50,6 +52,7 @@ This plan implements the redesigned protocol (PROTOCOL.md) and lifecycle (LIFE_C
 ```
 
 **Tasks:**
+
 - [x] Create `types.js` with JSDoc type definitions
 - [x] Create `createEmptyState()` factory function
 - [x] Create `createCard(column, text, authorId)` factory
@@ -62,6 +65,7 @@ This plan implements the redesigned protocol (PROTOCOL.md) and lifecycle (LIFE_C
 The server currently tracks connections but not client identity. Add:
 
 **Tasks:**
+
 - [x] Add `ConcurrentDictionary<string, HashSet<string>>` to track `boardId → Set<clientId>`
 - [x] Parse `hello` message to extract `clientId`
 - [x] Reject duplicate `clientId` per board (send `error`, close connection)
@@ -74,6 +78,7 @@ The server currently tracks connections but not client identity. Add:
 **File:** `wwwroot/js/connection.js` (new, replaces WebSocket code in app.js)
 
 **Tasks:**
+
 - [x] Generate/persist `clientId` in localStorage
 - [x] On connect: send `hello { clientId }`
 - [x] Wait for `welcome` before considering connection ready
@@ -86,6 +91,7 @@ The server currently tracks connections but not client identity. Add:
 **Files:** `BoardHub.cs`, `wwwroot/js/connection.js`
 
 **Tasks:**
+
 - [x] Client: send `ping` every 10 seconds when connected
 - [x] Server: respond with `pong`
 - [x] Server: track last message time per connection, close after 30s inactivity
@@ -102,6 +108,7 @@ The server currently tracks connections but not client identity. Add:
 Implement merge rules from PROTOCOL.md:
 
 **Tasks:**
+
 - [x] `mergeCard(local, remote)` — compare rev, then authorId, then isDeleted
 - [x] `mergeVote(local, remote)` — compare rev, then voterId, then isDeleted
 - [x] `mergePhase(local, remote)` — reviewing always wins
@@ -113,6 +120,7 @@ Implement merge rules from PROTOCOL.md:
 **File:** `wwwroot/js/sync.js` (rewrite)
 
 **Tasks:**
+
 - [x] On `welcome`: request sync from existing clients (server notifies them)
 - [x] Buffer incoming `cardOp`/`vote` messages during sync window (1-2s)
 - [x] Collect `syncState` messages, merge them all
@@ -124,6 +132,7 @@ Implement merge rules from PROTOCOL.md:
 **File:** `wwwroot/js/dedup.js` (new)
 
 **Tasks:**
+
 - [x] Maintain `Set<string>` of seen opIds (in-memory, session lifetime)
 - [x] Check opId before applying any operation
 - [x] Generate unique opIds: `${clientId}:${timestamp}:${counter}`
@@ -139,6 +148,7 @@ Implement merge rules from PROTOCOL.md:
 Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 
 **Tasks:**
+
 - [x] `applyCardOp(state, op)` — handles create/edit/delete based on presence and rev
 - [x] Local operations increment rev before broadcast
 - [x] Remote operations use LWW merge
@@ -150,6 +160,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/js/operations.js`
 
 **Tasks:**
+
 - [x] `applyVote(state, op)` — add or remove vote
 - [x] Vote entity model: one entry per (cardId, voterId) pair
 - [x] Tombstone removed votes
@@ -161,6 +172,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/js/connection.js`
 
 **Tasks:**
+
 - [x] `broadcast(message)` — add opId, send via WebSocket
 - [x] Handle incoming messages by type: `cardOp`, `vote`, `syncState`, `participantsUpdate`, etc.
 - [x] Route to appropriate handlers
@@ -170,6 +182,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/js/app.js`
 
 **Tasks:**
+
 - [x] Initialize local board state for the board page
 - [x] Wire "+ Add Card" buttons to create local card ops and broadcast
 - [x] Render cards from state (both columns)
@@ -188,6 +201,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **Files:** `wwwroot/js/app.js`, `BoardHub.cs`
 
 **Tasks:**
+
 - [ ] Add "Ready" button to UI
 - [ ] Send `setReady { ready: true/false }` on toggle
 - [ ] Server tracks readiness, broadcasts `participantsUpdate`
@@ -198,6 +212,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **Files:** `wwwroot/js/app.js`, `wwwroot/js/operations.js`
 
 **Tasks:**
+
 - [ ] Calculate quorum threshold: `ceil(0.6 * participantCount)` (min 1 for solo, both for 2)
 - [ ] When quorum reached: any ready client may broadcast `phaseChanged { phase: "reviewing" }`
 - [ ] `applyPhaseChanged(state, op)` — transition to reviewing (monotonic)
@@ -208,6 +223,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/js/app.js`
 
 **Tasks:**
+
 - [ ] In reviewing phase: disable card creation, editing, deletion
 - [ ] In reviewing phase: disable voting
 - [ ] In reviewing phase: hide ready button
@@ -222,6 +238,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/js/connection.js`
 
 **Tasks:**
+
 - [ ] Use Web Locks API: `navigator.locks.request(`delta-board-${boardId}`, ...)`
 - [ ] If lock unavailable: show error, don't connect
 - [ ] Fallback for browsers without Web Locks: server-side rejection (already in 1.2)
@@ -231,6 +248,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/js/connection.js`
 
 **Tasks:**
+
 - [ ] On disconnect: attempt reconnect with exponential backoff (existing logic)
 - [ ] On reconnect: go through full handshake + sync flow
 - [ ] Preserve local state across reconnects
@@ -240,6 +258,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/js/app.js`
 
 **Tasks:**
+
 - [ ] Detect old board format in localStorage (missing `phase`, `rev` fields)
 - [ ] Show message: "This board uses an old format. Please create a new board."
 - [ ] Optionally: offer to delete old board data
@@ -249,6 +268,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 **File:** `wwwroot/index.html`, `wwwroot/css/styles.css`
 
 **Tasks:**
+
 - [ ] Add participant count display
 - [ ] Add ready count display
 - [ ] Add ready toggle button
@@ -259,19 +279,19 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 
 ## File Changes Summary
 
-| File | Action | Description |
-|------|--------|-------------|
-| `wwwroot/js/types.js` | Create | Type definitions and factories |
-| `wwwroot/js/connection.js` | Create | WebSocket + handshake + heartbeat |
-| `wwwroot/js/merge.js` | Create | LWW merge logic |
-| `wwwroot/js/dedup.js` | Create | opId deduplication |
-| `wwwroot/js/sync.js` | Rewrite | Join-time sync flow |
-| `wwwroot/js/operations.js` | Rewrite | cardOp, vote, phase operations |
-| `wwwroot/js/app.js` | Rewrite | UI logic, phase enforcement |
-| `wwwroot/js/board.js` | Delete | Merged into other modules |
-| `BoardHub.cs` | Modify | Presence, readiness, hello/welcome |
-| `wwwroot/index.html` | Modify | New UI elements |
-| `wwwroot/css/styles.css` | Modify | Phase/readiness styling |
+| File                       | Action  | Description                        |
+| -------------------------- | ------- | ---------------------------------- |
+| `wwwroot/js/types.js`      | Create  | Type definitions and factories     |
+| `wwwroot/js/connection.js` | Create  | WebSocket + handshake + heartbeat  |
+| `wwwroot/js/merge.js`      | Create  | LWW merge logic                    |
+| `wwwroot/js/dedup.js`      | Create  | opId deduplication                 |
+| `wwwroot/js/sync.js`       | Rewrite | Join-time sync flow                |
+| `wwwroot/js/operations.js` | Rewrite | cardOp, vote, phase operations     |
+| `wwwroot/js/app.js`        | Rewrite | UI logic, phase enforcement        |
+| `wwwroot/js/board.js`      | Delete  | Merged into other modules          |
+| `BoardHub.cs`              | Modify  | Presence, readiness, hello/welcome |
+| `wwwroot/index.html`       | Modify  | New UI elements                    |
+| `wwwroot/css/styles.css`   | Modify  | Phase/readiness styling            |
 
 ---
 
@@ -280,6 +300,7 @@ Replace `createCard`/`editCard`/`deleteCard` with unified `cardOp`:
 Execute phases sequentially. Within each phase, tasks can often be parallelized.
 
 Recommended order for Phase 1:
+
 1. `types.js` (no dependencies)
 2. Server changes to `BoardHub.cs` (hello/welcome/presence)
 3. `connection.js` (depends on server changes)

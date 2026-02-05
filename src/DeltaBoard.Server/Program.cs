@@ -33,8 +33,15 @@ static void RunApp(string[] args)
     // WS
     app.UseWebSockets();
     // Serve static files from wwwroot
-    app.UseDefaultFiles();
     app.UseStaticFiles();
+
+    // Landing page
+    app.MapGet("/", async context =>
+    {
+        context.Response.ContentType = "text/html";
+        await context.Response.SendFileAsync(
+            Path.Combine(app.Environment.WebRootPath, "index.html"));
+    });
 
     // WS endpoint
     app.Map("/board/{boardId}/ws", async (HttpContext context, BoardHub hub, IHostApplicationLifetime lifetime, string boardId) =>
@@ -64,6 +71,15 @@ static void RunApp(string[] args)
 
     // Health check
     app.MapGet("/health", () => "OK");
+
+    // 404 fallback
+    app.MapFallback(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        context.Response.ContentType = "text/html";
+        await context.Response.SendFileAsync(
+            Path.Combine(app.Environment.WebRootPath, "404.html"));
+    });
 
     // Run
     app.Run();

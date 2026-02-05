@@ -33,7 +33,9 @@ delta-board/
 │   └── DeltaBoard.Server/       # C# server (serves API + static files)
 │       ├── wwwroot/             # Client web application
 │       │   ├── index.html
+│       │   ├── 404.html
 │       │   ├── css/
+│       │   │   ├── shared.css
 │       │   │   └── styles.css
 │       │   └── js/
 │       │       └── app.js

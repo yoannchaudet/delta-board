@@ -250,7 +250,6 @@ Delete:
 - `voterId` (string, required)
 - `rev` (number, required; monotonic per `voterId` per `cardId`)
 
-
 <a id="schema-error"></a>
 
 ### `error` (Server → Client)
@@ -300,7 +299,6 @@ Malicious or modified clients can cheat (for example, forging votes or bypassing
 ## Reliable Operation Delivery
 
 All state-changing client operations ([cardOp](#schema-cardop), [vote](#schema-vote), [setReady](#schema-setready), [phaseChanged](#schema-phasechanged)) must include a unique `opId`.
-
 
 If an operation is invalid, the server responds:
 See the `error` schema in the Message Schemas section: [error](#schema-error).
