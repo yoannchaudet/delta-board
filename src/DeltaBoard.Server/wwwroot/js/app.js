@@ -257,11 +257,61 @@ function initBoard(boardId) {
         // Hide ready count from presence
         document.getElementById('ready-count').innerHTML = '';
 
-        // Show phase chip
+        // Show phase chip and export button
         document.getElementById('phase-chip').style.display = '';
+        document.getElementById('download-btn').style.display = '';
 
         renderBoard();
     }
+
+    function formatCardMarkdown(card) {
+        const votes = getVoteCount(state, card.id);
+        const voteLabel = votes === 1 ? '1 vote' : `${votes} votes`;
+        const lines = card.text.split('\n');
+        const first = `- ${lines[0]}`;
+        const rest = lines.slice(1).map(line => line ? `  ${line}` : '');
+        return [first, ...rest].join('\n\n') + ` (${voteLabel})\n`;
+    }
+
+    function generateMarkdown() {
+        const wellCards = getVisibleCards(state, 'well')
+            .sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
+        const deltaCards = getVisibleCards(state, 'delta')
+            .sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
+
+        let md = `# ${boardId}\n\n`;
+
+        md += '## What Went Well\n\n';
+        if (wellCards.length === 0) {
+            md += '_No cards._\n';
+        } else {
+            for (const card of wellCards) {
+                md += formatCardMarkdown(card);
+            }
+        }
+
+        md += '\n## Delta\n\n';
+        if (deltaCards.length === 0) {
+            md += '_No cards._\n';
+        } else {
+            for (const card of deltaCards) {
+                md += formatCardMarkdown(card);
+            }
+        }
+
+        return md;
+    }
+
+    document.getElementById('download-btn').addEventListener('click', () => {
+        const md = generateMarkdown();
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${boardId}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
 
     // Store for debugging
     window._connection = connection;
