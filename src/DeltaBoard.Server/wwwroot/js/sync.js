@@ -1,103 +1,159 @@
-// State synchronization and merging logic
+// Sync Module - Join-time state synchronization
 
-import * as ops from './operations.js';
+import { mergeState } from './merge.js';
+import { createEmptyState } from './types.js';
 
-/**
- * Merge remote state into local state (CRDT-style union)
- * - Cards: add any cards we don't have
- * - Votes: union of all voter IDs per card
- */
-export function mergeState(localState, remoteState) {
-    if (!remoteState) return localState;
-
-    let newState = { ...localState };
-
-    // Merge cards (add any we don't have)
-    if (remoteState.cards) {
-        const existingIds = new Set(localState.cards.map(c => c.id));
-        const newCards = remoteState.cards.filter(c => !existingIds.has(c.id));
-        if (newCards.length > 0) {
-            newState = {
-                ...newState,
-                cards: [...newState.cards, ...newCards]
-            };
-        }
-    }
-
-    // Merge votes (union of voter IDs)
-    if (remoteState.votes) {
-        const newVotes = { ...newState.votes };
-        for (const [cardId, voters] of Object.entries(remoteState.votes)) {
-            const existingVoters = new Set(newVotes[cardId] || []);
-            const allVoters = [...existingVoters];
-            for (const voter of voters) {
-                if (!existingVoters.has(voter)) {
-                    allVoters.push(voter);
-                }
-            }
-            newVotes[cardId] = allVoters;
-        }
-        newState = { ...newState, votes: newVotes };
-    }
-
-    return newState;
-}
+const SYNC_WINDOW_MS = 2000; // Wait 2 seconds for syncState messages
 
 /**
- * Apply a remote operation to local state
- * Returns { state, handled } where handled indicates if the operation was processed
+ * @typedef {import('./types.js').BoardState} BoardState
  */
-export function applyOperation(state, operation) {
-    switch (operation.type) {
-        case 'createCard':
-            if (ops.hasCard(state, operation.card.id)) {
-                return { state, handled: false };
-            }
-            return {
-                state: {
-                    ...state,
-                    cards: [...state.cards, operation.card]
-                },
-                handled: true
-            };
 
-        case 'editCard': {
-            const cardIndex = state.cards.findIndex(c => c.id === operation.cardId);
-            if (cardIndex === -1) {
-                return { state, handled: false };
-            }
-            return {
-                state: ops.editCard(state, operation.cardId, operation.text),
-                handled: true
-            };
-        }
+/**
+ * @typedef {Object} SyncCallbacks
+ * @property {(state: BoardState) => void} onStateReady - Called when sync is complete
+ * @property {(state: BoardState) => void} onBroadcastState - Called when we should broadcast our state
+ * @property {(ops: Array<Object>) => void} [onBufferedOps] - Called with buffered operations after sync
+ */
 
-        case 'deleteCard':
-            if (!ops.hasCard(state, operation.cardId)) {
-                return { state, handled: false };
-            }
-            return {
-                state: ops.deleteCard(state, operation.cardId),
-                handled: true
-            };
+/**
+ * Create a sync manager for a board session
+ * @param {() => BoardState | null} getLocalState - Function to get current local state
+ * @param {SyncCallbacks} callbacks
+ * @returns {Object} Sync controller
+ */
+export function createSyncManager(getLocalState, callbacks) {
+    /** @type {boolean} */
+    let isSyncing = false;
 
-        case 'addVote': {
-            const newState = ops.addVote(state, operation.cardId, operation.voterId);
-            return {
-                state: newState,
-                handled: newState !== state
-            };
-        }
+    /** @type {BoardState[]} */
+    let receivedStates = [];
 
-        case 'removeVote': {
-            const newState = ops.removeVote(state, operation.cardId, operation.voterId);
-            return {
-                state: newState,
-                handled: newState !== state
-            };
-        }
+    /** @type {Array<{type: string, [key: string]: any}>} */
+    let bufferedOps = [];
 
-        default:
-            return { state, handled: false };
+    /** @type {number | null} */
+    let syncTimeout = null;
+
+    /**
+     * Start the sync window after receiving welcome
+     * Called when connection transitions to ready state
+     */
+    function startSync() {
+        isSyncing = true;
+        receivedStates = [];
+        bufferedOps = [];
+
+        // Set timeout to complete sync after window
+        syncTimeout = setTimeout(() => {
+            completeSync();
+        }, SYNC_WINDOW_MS);
     }
+
+    /**
+     * Handle an incoming syncState message
+     * @param {BoardState} state
+     */
+    function handleSyncState(state) {
+        if (isSyncing) {
+            receivedStates.push(state);
+        } else {
+            // Late syncState - merge immediately
+            const local = getLocalState() || createEmptyState();
+            const { state: merged, changed } = mergeState(local, state);
+            if (changed) {
+                callbacks.onStateReady(merged);
+            }
+        }
+    }
+
+    /**
+     * Handle an incoming operation during sync
+     * @param {Object} op - The operation (cardOp or vote)
+     * @returns {boolean} true if buffered, false if should be applied immediately
+     */
+    function handleOperation(op) {
+        if (isSyncing) {
+            bufferedOps.push(op);
+            return true; // Buffered
+        }
+        return false; // Apply immediately
+    }
+
+    /**
+     * Complete the sync process
+     */
+    function completeSync() {
+        if (!isSyncing) return;
+
+        isSyncing = false;
+        if (syncTimeout !== null) {
+            clearTimeout(syncTimeout);
+            syncTimeout = null;
+        }
+
+        // Start with local state or empty
+        let finalState = getLocalState() || createEmptyState();
+        // Merge all received states
+        for (const remoteState of receivedStates) {
+            const result = mergeState(finalState, remoteState);
+            finalState = result.state;
+        }
+
+        // Notify that state is ready
+        callbacks.onStateReady(finalState);
+
+        // Broadcast our merged state once after the join window completes
+        callbacks.onBroadcastState(finalState);
+
+        // Apply buffered operations
+        const ops = bufferedOps;
+        bufferedOps = [];
+        receivedStates = [];
+
+        if (ops.length > 0) {
+            callbacks.onBufferedOps?.(ops);
+        }
+
+        return ops;
+    }
+
+    /**
+     * Get buffered operations (after sync completes)
+     * @returns {Array<Object>}
+     */
+    function getBufferedOps() {
+        return bufferedOps;
+    }
+
+    /**
+     * Check if currently in sync window
+     * @returns {boolean}
+     */
+    function isSyncInProgress() {
+        return isSyncing;
+    }
+
+    /**
+     * Cancel sync (on disconnect)
+     */
+    function cancel() {
+        isSyncing = false;
+        if (syncTimeout !== null) {
+            clearTimeout(syncTimeout);
+            syncTimeout = null;
+        }
+        receivedStates = [];
+        bufferedOps = [];
+    }
+
+    return {
+        startSync,
+        handleSyncState,
+        handleOperation,
+        completeSync,
+        getBufferedOps,
+        isSyncInProgress,
+        cancel
+    };
 }

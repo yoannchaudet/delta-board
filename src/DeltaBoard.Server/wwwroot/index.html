@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/css/shared.css">
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -15,13 +16,22 @@
         <div class="header-brand">
             <img src="/images/mark.svg" alt="Delta Board" class="header-logo">
             <div class="header-title">
-                <h1 id="board-title">Delta Board</h1>
+                <nav id="board-breadcrumb" class="breadcrumb" style="display: none;">
+                    <a id="back-to-boards" href="/" class="breadcrumb-link">Boards</a>
+                    <span class="breadcrumb-sep">/</span>
+                    <h1 id="board-title" class="breadcrumb-current">Delta Board</h1>
+                    <span id="phase-chip" class="phase-chip" style="display: none;">Reviewing</span>
+                </nav>
+                <h1 id="landing-title" class="landing-title">Delta Board</h1>
                 <p id="header-tagline" class="header-tagline">Lightweight team retros</p>
             </div>
         </div>
         <div class="header-actions">
+            <button id="ready-btn" class="btn-ready" style="display: none;"><span class="btn-ready-check">&#x2714;</span> I'm ready</button>
+            <button id="download-btn" class="btn-export" style="display: none;">&#x2B07;&#xFE0E; Export Markdown</button>
+            <span id="participant-count" class="participant-count" style="display: none;"><span id="participant-number" class="participant-number"></span> online<span id="ready-count" class="ready-count"></span></span>
             <span id="connection-status" class="status-indicator"></span>
-            <button id="export-btn" class="btn btn-secondary">Export to Markdown</button>
+            <button id="reconnect-btn" class="btn-reconnect" style="display: none;">Reconnect</button>
         </div>
     </header>
 
@@ -38,11 +48,39 @@
         </section>
     </main>
 
+    <div id="edit-overlay" class="edit-overlay"></div>
     <main id="board-page" class="board" style="display: none;">
+        <div id="quorum-banner-wrapper" class="quorum-banner-wrapper">
+            <section class="quorum-banner">
+                <div class="quorum-banner-text">
+                    <h3>The group is ready to review</h3>
+                    <p>You can start the review phase whenever you're ready.</p>
+                </div>
+                <button id="start-review-btn" class="btn btn-start-review">Start Review</button>
+            </section>
+        </div>
+
+        <section class="card-input">
+            <div id="card-input-bar" class="card-input-bar">
+                <span id="card-input-bar-label">Add card</span>
+                <button id="card-input-cancel" class="card-input-cancel" style="display: none;">Cancel</button>
+            </div>
+            <textarea id="card-input-text" class="card-input-textarea" placeholder="Type your thought..." rows="2"></textarea>
+            <div class="card-input-buttons">
+                <button id="add-well-btn" class="btn btn-add-well" data-column="well">
+                    <span id="well-btn-label">Add to Went Well</span>
+                    <span class="shortcut-hint">Ctrl+Enter</span>
+                </button>
+                <button id="add-delta-btn" class="btn btn-add-delta" data-column="delta">
+                    <span id="delta-btn-label">Add to Delta</span>
+                    <span class="shortcut-hint">Ctrl+Shift+Enter</span>
+                </button>
+            </div>
+        </section>
+
         <section class="column" data-column="well">
             <div class="column-header">
                 <h2>What Went Well</h2>
-                <button class="btn btn-add" data-column="well">+ Add Card</button>
             </div>
             <div class="cards" id="well-cards"></div>
         </section>
@@ -50,7 +88,7 @@
         <section class="column" data-column="delta">
             <div class="column-header">
                 <h2>Delta</h2>
-                <button class="btn btn-add" data-column="delta">+ Add Card</button>
+                <p class="column-subtitle">What Could Be Better</p>
             </div>
             <div class="cards" id="delta-cards"></div>
         </section>

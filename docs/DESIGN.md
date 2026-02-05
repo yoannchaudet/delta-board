@@ -22,7 +22,7 @@ This reduces merge complexity, but convergence still requires handling unreliabl
 Key properties:
 
 - Operations are idempotent via a unique `opId`
-- Senders retry operations until the server acknowledges receipt
+- Senders do not wait for acknowledgments; operations are eventually consistent
 - Card edits use a per card monotonically increasing `rev` so late operations cannot overwrite newer ones
 - Vote state converges with an LWW boolean per (cardId, voterId) using a monotonic rev
 
@@ -39,7 +39,8 @@ CRDTs may be used as a future implementation detail, but the current design reli
 ### Local Storage Schema
 
 Client state is persisted in localStorage using a versioned schema.
-Clients should store a `schemaVersion` alongside board data and reset or migrate when the stored version is unsupported.
+Each board carries a `version` field (currently `1`). Boards loaded without a version are treated as version `1`.
+When the schema changes in the future, clients can migrate or reset boards with an unsupported version.
 
 ## URL Format
 
@@ -51,6 +52,7 @@ Boards use human-readable URLs with collision-resistant hashing:
 
 - **Board route**: `/board/{id}` - serves the SPA for a specific board
 - **WebSocket**: `/board/{id}/ws` - real-time collaboration endpoint
+- **Fallback**: Any unmatched route returns a server-rendered 404 page
 - **Board ID format**: `{adjective}-{noun}-{hash}` (e.g., `cosmic-waffle-x7k2`)
 - **Total combinations**: 20 adjectives × 20 nouns × 36⁴ = 671,846,400 unique boards
 

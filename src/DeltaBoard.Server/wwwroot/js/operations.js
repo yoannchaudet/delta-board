@@ -1,128 +1,112 @@
-// Pure state operations - all functions return new state without mutations
+// Operations Module - Apply card/vote ops and query helpers
 
-import { generateCardId } from './board.js';
-
-/**
- * Create a new card and return updated state + the created card
- */
-export function createCard(state, { column, text, owner }) {
-    const card = {
-        id: generateCardId(),
-        column,
-        text,
-        owner,
-        createdAt: Date.now()
-    };
-    return {
-        state: {
-            ...state,
-            cards: [...state.cards, card]
-        },
-        card
-    };
-}
+import { mergeCard, mergeVote } from './merge.js';
 
 /**
- * Edit an existing card's text
+ * @typedef {import('./types.js').BoardState} BoardState
+ * @typedef {import('./types.js').Card} Card
+ * @typedef {import('./types.js').Vote} Vote
  */
-export function editCard(state, cardId, text) {
-    const cardIndex = state.cards.findIndex(c => c.id === cardId);
-    if (cardIndex === -1) return state;
-
-    const newCards = [...state.cards];
-    newCards[cardIndex] = { ...newCards[cardIndex], text };
-
-    return {
-        ...state,
-        cards: newCards
-    };
-}
 
 /**
- * Delete a card and its votes
+ * Apply a card operation to state (create/edit/delete via tombstone)
+ * @param {BoardState} state
+ * @param {Object} op
+ * @param {string} op.cardId
+ * @param {string} op.column
+ * @param {string} op.text
+ * @param {string} op.authorId
+ * @param {number} op.rev
+ * @param {boolean} [op.isDeleted]
+ * @returns {BoardState}
  */
-export function deleteCard(state, cardId) {
-    const newCards = state.cards.filter(c => c.id !== cardId);
-    if (newCards.length === state.cards.length) return state;
-
-    const newVotes = { ...state.votes };
-    delete newVotes[cardId];
-
-    return {
-        ...state,
-        cards: newCards,
-        votes: newVotes
+export function applyCardOp(state, op) {
+    const index = state.cards.findIndex(card => card.id === op.cardId);
+    const nextCard = {
+        id: op.cardId,
+        column: op.column,
+        text: op.text,
+        authorId: op.authorId,
+        rev: op.rev,
+        isDeleted: Boolean(op.isDeleted)
     };
-}
 
-/**
- * Add a vote from a voter to a card
- */
-export function addVote(state, cardId, voterId) {
-    const currentVoters = state.votes[cardId] || [];
-    if (currentVoters.includes(voterId)) return state;
-
-    return {
-        ...state,
-        votes: {
-            ...state.votes,
-            [cardId]: [...currentVoters, voterId]
-        }
-    };
-}
-
-/**
- * Remove a vote from a voter on a card
- */
-export function removeVote(state, cardId, voterId) {
-    const currentVoters = state.votes[cardId];
-    if (!currentVoters || !currentVoters.includes(voterId)) return state;
-
-    return {
-        ...state,
-        votes: {
-            ...state.votes,
-            [cardId]: currentVoters.filter(v => v !== voterId)
-        }
-    };
-}
-
-/**
- * Toggle a vote - add if not present, remove if present
- */
-export function toggleVote(state, cardId, voterId) {
-    const currentVoters = state.votes[cardId] || [];
-    if (currentVoters.includes(voterId)) {
-        return removeVote(state, cardId, voterId);
-    } else {
-        return addVote(state, cardId, voterId);
+    if (index === -1) {
+        state.cards.push(nextCard);
+        return state;
     }
+
+    const merged = mergeCard(state.cards[index], nextCard);
+    state.cards[index] = merged;
+    return state;
 }
 
 /**
- * Check if a card exists
+ * Apply a vote operation to state (add/remove via tombstone)
+ * @param {BoardState} state
+ * @param {Object} op
+ * @param {string} op.cardId
+ * @param {string} op.voterId
+ * @param {number} op.rev
+ * @param {boolean} [op.isDeleted]
+ * @returns {BoardState}
  */
-export function hasCard(state, cardId) {
-    return state.cards.some(c => c.id === cardId);
+export function applyVote(state, op) {
+    const voteId = `${op.cardId}:${op.voterId}`;
+    const index = state.votes.findIndex(vote => vote.id === voteId);
+    const nextVote = {
+        id: voteId,
+        cardId: op.cardId,
+        voterId: op.voterId,
+        rev: op.rev,
+        isDeleted: Boolean(op.isDeleted)
+    };
+
+    if (index === -1) {
+        state.votes.push(nextVote);
+        return state;
+    }
+
+    const merged = mergeVote(state.votes[index], nextVote);
+    state.votes[index] = merged;
+    return state;
 }
 
 /**
- * Get cards by column
+ * Get visible (non-deleted) cards for a column
+ * @param {BoardState} state
+ * @param {Card['column']} column
+ * @returns {Card[]}
  */
-export function getCardsByColumn(state, column) {
-    return state.cards.filter(c => c.column === column);
+export function getVisibleCards(state, column) {
+    return state.cards.filter(card => card.column === column && !card.isDeleted);
 }
 
 /**
- * Get vote count for a card
+ * Count votes for a card (non-deleted)
+ * @param {BoardState} state
+ * @param {string} cardId
+ * @returns {number}
  */
 export function getVoteCount(state, cardId) {
-    return state.votes[cardId]?.length || 0;
+    let count = 0;
+    for (const vote of state.votes) {
+        if (vote.cardId === cardId && !vote.isDeleted) {
+            count++;
+        }
+    }
+    return count;
 }
 
 /**
- * Check if a voter has voted for a card
+ * Check if a voter has an active vote on a card
+ * @param {BoardState} state
+ * @param {string} cardId
+ * @param {string} voterId
+ * @returns {boolean}
  */
 export function hasVoted(state, cardId, voterId) {
-    return state.votes[cardId]?.includes(voterId) || false;
+    const voteId = `${cardId}:${voterId}`;
+    const vote = state.votes.find(v => v.id === voteId);
+    return Boolean(vote && !vote.isDeleted);
 }

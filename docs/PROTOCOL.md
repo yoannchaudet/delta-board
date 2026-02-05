@@ -14,7 +14,6 @@ Delta Board uses WebSockets for real-time collaboration between clients. The ser
 | [syncState](#schema-syncstate)                   | Client → Client (via Server)  | Send full board state to a new client           |
 | [cardOp](#schema-cardop)                         | Client → Clients (via Server) | Card operation (create, edit, or delete)        |
 | [vote](#schema-vote)                             | Client → Clients (via Server) | Vote operation (add or remove)                  |
-| [ack](#schema-ack)                               | Server → Client               | Acknowledges receipt of an operation            |
 | [error](#schema-error)                           | Server → Client               | Indicates an operation was rejected             |
 | [ping](#schema-ping)                             | Client → Server               | Heartbeat to indicate client is alive           |
 | [pong](#schema-pong)                             | Server → Client               | Acknowledges heartbeat                          |
@@ -67,6 +66,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `type` (string, required)
 - `participantsCount` (number, required)
 - `readyCount` (number, required)
+- `welcome` provides the new client with the current counts; the server does **not** send a `participantsUpdate` back to the joining client.
 
 <a id="schema-participantsupdate"></a>
 
@@ -89,6 +89,7 @@ All messages are JSON objects sent over the WebSocket connection.
 - `participantsCount` (number, required)
 - `readyCount` (number, required)
 - `syncForClientId` (string, optional; when present, indicates who needs a [syncState](#schema-syncstate))
+- On join/leave, the server broadcasts `participantsUpdate` to **all other** connected clients (not the initiator).
 
 <a id="schema-setready"></a>
 
@@ -122,6 +123,7 @@ All messages are JSON objects sent over the WebSocket connection.
 {
   "type": "syncState",
   "targetClientId": "...",
+  "version": 1,
   "phase": "forming",
   "cards": [
     {
@@ -139,6 +141,7 @@ All messages are JSON objects sent over the WebSocket connection.
 
 - `type` (string, required)
 - `targetClientId` (string, optional; when omitted, server broadcasts to all clients except the sender)
+- `version` (number, required; board schema version, currently `1`)
 - `phase` (string, required)
 - `cards` (array, required)
   - `id` (string, required)
@@ -249,17 +252,6 @@ Delete:
 - `voterId` (string, required)
 - `rev` (number, required; monotonic per `voterId` per `cardId`)
 
-<a id="schema-ack"></a>
-
-### `ack` (Server → Client)
-
-```json
-{ "type": "ack", "opId": "uuid" }
-```
-
-- `type` (string, required)
-- `opId` (string, required)
-
 <a id="schema-error"></a>
 
 ### `error` (Server → Client)
@@ -310,12 +302,6 @@ Malicious or modified clients can cheat (for example, forging votes or bypassing
 
 All state-changing client operations ([cardOp](#schema-cardop), [vote](#schema-vote), [setReady](#schema-setready), [phaseChanged](#schema-phasechanged)) must include a unique `opId`.
 
-The server acknowledges receipt:
-See the `ack` schema in the Message Schemas section: [ack](#schema-ack).
-
-If the client does not receive an `ack` within a short timeout, it must retry sending the same operation with the same `opId`.
-Clients should use exponential backoff with jitter to avoid retry storms on flaky connections.
-
 If an operation is invalid, the server responds:
 See the `error` schema in the Message Schemas section: [error](#schema-error).
 
@@ -326,20 +312,19 @@ Boards are short-lived, so unbounded growth is acceptable for this project.
 
 ### Reliability & Acknowledgements
 
-The following messages MUST include `opId` and participate in ack/retry:
+The following messages MUST include `opId`:
 
 - [cardOp](#schema-cardop)
 - [vote](#schema-vote)
 - [setReady](#schema-setready)
 - [phaseChanged](#schema-phasechanged)
 
-The following messages do NOT include `opId` and are not acked:
+The following messages do NOT include `opId`:
 
 - [hello](#schema-hello)
 - [welcome](#schema-welcome)
 - [participantsUpdate](#schema-participantsupdate)
 - [syncState](#schema-syncstate)
-- [ack](#schema-ack)
 - [error](#schema-error)
 - [ping](#schema-ping) / [pong](#schema-pong)
 
@@ -369,7 +354,6 @@ sequenceDiagram
 ## Operation Broadcast Flow
 
 All operations are idempotent and include an `opId`.
-See the [cardOp](#schema-cardop) and [ack](#schema-ack) schemas.
 
 ```mermaid
 sequenceDiagram
@@ -379,7 +363,6 @@ sequenceDiagram
     participant C as Client C
 
     A->>S: cardOp { opId }
-    S->>A: ack { opId }
     S->>B: cardOp
     S->>C: cardOp
 ```
@@ -454,7 +437,7 @@ Phase is monotonic: `reviewing` overrides `forming` whenever states are merged.
 Clients may receive multiple `syncState` responses when joining.
 For a stable initial view, clients should wait a short join window (for example, 1-2 seconds) to collect snapshots before using the board.
 If no `syncState` arrives in that window, proceed with local state and continue listening for later snapshots.
-If the local state changes as a result of the join-time merge, the client should proactively broadcast its merged `syncState` once.
+After the join-time merge window completes, the client should proactively broadcast its merged `syncState` once, even if the local state did not change.
 If no client with intact local state reconnects, the board state cannot be recovered.
 
 ## Phase Enforcement
@@ -483,7 +466,7 @@ Clients must validate outgoing and incoming operations:
 - For votes: clients set `rev = (max rev seen for that (cardId, voterId)) + 1` when adding or removing.
 - Clients SHOULD persist current card/vote `rev` values as part of local state so reloads do not reset counters.
 - On join, clients SHOULD buffer incoming operations while collecting `syncState`, then apply buffered ops after the join-time merge completes.
-- `syncState` SHOULD be targeted using `targetClientId`. Broadcasting a `syncState` (omitting `targetClientId`) should only be done once after a join-time merge that changed local state.
+- `syncState` SHOULD be targeted using `targetClientId`. Broadcasting a `syncState` (omitting `targetClientId`) should only be done once after the join-time merge window completes.
 
 ## Client Identity
 

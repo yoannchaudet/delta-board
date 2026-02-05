@@ -51,7 +51,7 @@ function renderBoardsList() {
 
 /**
  * Create a board card element
- * @param {{id: string, cardCount: number, lastModified: number|null}} board
+ * @param {{id: string, cardCount: number, voteCount: number, phase: string, lastModified: number|null}} board
  * @returns {HTMLElement}
  */
 function createBoardCard(board) {
@@ -60,18 +60,21 @@ function createBoardCard(board) {
     card.href = `/board/${board.id}`;
 
     const cardCountText = board.cardCount === 1 ? '1 card' : `${board.cardCount} cards`;
-    const dateText = board.lastModified ? formatDate(board.lastModified) : 'No cards yet';
+    const voteCountText = board.voteCount === 1 ? '1 vote' : `${board.voteCount} votes`;
+    const reviewingChip = board.phase === 'reviewing'
+        ? '<span class="phase-chip">Reviewing</span>'
+        : '';
 
     card.innerHTML = `
         <div class="board-card-content">
-            <h3 class="board-card-title">${escapeHtml(board.id)}</h3>
+            <h3 class="board-card-title">${escapeHtml(board.id)}${reviewingChip}</h3>
             <div class="board-card-meta">
                 <span>${cardCountText}</span>
-                <span>•</span>
-                <span>${dateText}</span>
+                <span>·</span>
+                <span>${voteCountText}</span>
             </div>
         </div>
-        <button class="board-card-delete" title="Delete board">×</button>
+        <button class="btn-card-action btn-delete board-card-delete" title="Delete board">Delete</button>
     `;
 
     // Prevent navigation when clicking delete button

@@ -1,390 +1,733 @@
-// Delta Board - Main Application Entry Point
+// Main Application Entry Point
 
-import { generateBoardId, generateClientId, createEmptyState } from './board.js';
-import * as ops from './operations.js';
-import * as sync from './sync.js';
 import { initLandingPage } from './landing.js';
+import { createConnection } from './connection.js';
+import { createEmptyState, createCard } from './types.js';
+import { applyCardOp, applyVote, getVisibleCards, getVoteCount, hasVoted } from './operations.js';
+import { saveBoard, loadBoard } from './storage.js';
+import { createSyncManager } from './sync.js';
+import { createDedup } from './dedup.js';
 
-// === State Management ===
+// Module-level phase so status functions can check it
+let currentPhase = 'forming';
 
-const BOARD_PATH_PREFIX = '/board/';
-
-function isLandingPage() {
+/**
+ * Detect current page from URL
+ * @returns {'landing' | 'board'}
+ */
+function detectPage() {
     const path = window.location.pathname;
-    return path === '/' || path === '/index.html';
+    return path.startsWith('/board/') ? 'board' : 'landing';
 }
 
+/**
+ * Extract board ID from URL
+ * @returns {string | null}
+ */
 function getBoardId() {
-    const path = window.location.pathname;
-
-    // Check if we're on a board route
-    if (path.startsWith(BOARD_PATH_PREFIX)) {
-        return path.slice(BOARD_PATH_PREFIX.length);
-    }
-
-    // Not on a board route - return null (landing page handles this)
-    return null;
+    const match = window.location.pathname.match(/^\/board\/([^/]+)/);
+    return match ? match[1] : null;
 }
 
-function getClientId() {
-    let clientId = localStorage.getItem('deltaboard-client-id');
-    if (!clientId) {
-        clientId = generateClientId();
-        localStorage.setItem('deltaboard-client-id', clientId);
-    }
-    return clientId;
-}
+/**
+ * Initialize the application
+ */
+function init() {
+    const page = detectPage();
 
-function loadState(boardId) {
-    const saved = localStorage.getItem(`deltaboard-${boardId}`);
-    if (saved) {
-        return JSON.parse(saved);
-    }
-    // Create and save empty state so board appears in boards list
-    const state = createEmptyState(boardId);
-    saveState(boardId, state);
-    return state;
-}
-
-function saveState(boardId, state) {
-    localStorage.setItem(`deltaboard-${boardId}`, JSON.stringify(state));
-}
-
-// === Application State ===
-
-let boardId = null;
-let clientId = null;
-let state = null;
-
-// === Operations (with side effects) ===
-
-function createCard(column, text) {
-    const result = ops.createCard(state, { column, text, owner: clientId });
-    state = result.state;
-    saveState(boardId, state);
-    renderCards();
-    broadcastOperation({ type: 'createCard', card: result.card });
-    return result.card;
-}
-
-function editCard(cardId, text) {
-    const newState = ops.editCard(state, cardId, text);
-    if (newState !== state) {
-        state = newState;
-        saveState(boardId, state);
-        broadcastOperation({ type: 'editCard', cardId, text });
-    }
-}
-
-function deleteCard(cardId) {
-    const newState = ops.deleteCard(state, cardId);
-    if (newState !== state) {
-        state = newState;
-        saveState(boardId, state);
-        renderCards();
-        broadcastOperation({ type: 'deleteCard', cardId });
-    }
-}
-
-function toggleVote(cardId) {
-    const hadVote = ops.hasVoted(state, cardId, clientId);
-    state = ops.toggleVote(state, cardId, clientId);
-    saveState(boardId, state);
-    renderCards();
-
-    if (hadVote) {
-        broadcastOperation({ type: 'removeVote', cardId, voterId: clientId });
+    if (page === 'landing') {
+        document.getElementById('landing-page').style.display = 'block';
+        document.getElementById('board-page').style.display = 'none';
+        document.getElementById('connection-status').style.display = 'none';
+        document.getElementById('reconnect-btn').style.display = 'none';
+        initLandingPage();
     } else {
-        broadcastOperation({ type: 'addVote', cardId, voterId: clientId });
+        document.getElementById('landing-page').style.display = 'none';
+        document.getElementById('board-page').style.display = 'grid';
+        document.getElementById('header-tagline').style.display = 'none';
+        document.getElementById('landing-title').style.display = 'none';
+        document.getElementById('board-breadcrumb').style.display = '';
+
+        const boardId = getBoardId();
+        document.getElementById('board-title').textContent = boardId;
+
+        initBoard(boardId);
     }
 }
 
-// === Remote Operations ===
+/**
+ * Initialize the board page
+ * @param {string} boardId
+ */
+function initBoard(boardId) {
+    const statusEl = document.getElementById('connection-status');
+    const wellCardsEl = document.getElementById('well-cards');
+    const deltaCardsEl = document.getElementById('delta-cards');
 
-function applyRemoteOperation(operation) {
-    switch (operation.type) {
-        case 'requestSync':
-            sendSyncState(operation._connectionId);
-            break;
+    // Card input elements
+    const cardInputText = document.getElementById('card-input-text');
+    const addWellBtn = document.getElementById('add-well-btn');
+    const addDeltaBtn = document.getElementById('add-delta-btn');
+    const cardInputBar = document.getElementById('card-input-bar');
+    const cardInputBarLabel = document.getElementById('card-input-bar-label');
+    const cardInputCancel = document.getElementById('card-input-cancel');
+    const editOverlay = document.getElementById('edit-overlay');
+    const wellBtnLabel = document.getElementById('well-btn-label');
+    const deltaBtnLabel = document.getElementById('delta-btn-label');
 
-        case 'syncState':
-            state = sync.mergeState(state, operation.state);
-            saveState(boardId, state);
-            renderCards();
-            break;
+    // Editing state - null when creating new, card object when editing
+    let editingCard = null;
 
-        default: {
-            const result = sync.applyOperation(state, operation);
-            if (result.handled) {
-                state = result.state;
-                saveState(boardId, state);
-                renderCards();
+    // Ready state
+    let isReady = false;
+    const readyBtn = document.getElementById('ready-btn');
+
+    // Load persisted state or create empty (and persist immediately for new boards)
+    let state = loadBoard(boardId);
+    if (!state) {
+        state = createEmptyState();
+        saveBoard(boardId, state);
+    }
+
+    // Create deduplication tracker
+    const dedup = createDedup();
+
+    // Create sync manager
+    const syncManager = createSyncManager(
+        () => state,
+        {
+            onStateReady: (newState) => {
+                const wasForming = state.phase === 'forming';
+                state = newState;
+                persistAndRender();
+                if (wasForming && state.phase === 'reviewing') {
+                    enterReviewPhase();
+                }
+            },
+            onBroadcastState: (stateToSend) => {
+                connection.send({
+                    type: 'syncState',
+                    state: stateToSend
+                });
+            },
+            onBufferedOps: (ops) => {
+                // Apply buffered operations after sync completes
+                for (const op of ops) {
+                    if (op.type === 'cardOp') {
+                        applyCardOpAndPersist(op);
+                    } else if (op.type === 'vote') {
+                        applyVoteAndPersist(op);
+                    }
+                }
             }
-            break;
         }
-    }
-}
+    );
 
-function sendSyncState(targetConnectionId) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-            type: 'syncState',
-            _targetConnectionId: targetConnectionId,
-            state: {
-                cards: state.cards,
-                votes: state.votes
+    const connection = createConnection(boardId, {
+        onStateChange: (connState) => {
+            updateConnectionStatus(statusEl, connState);
+            if (connState === 'ready') {
+                // Reset ready state (server forgets on reconnect)
+                isReady = false;
+                readyBtn.classList.remove('active');
+                // Start sync window when connection becomes ready
+                syncManager.startSync();
+            } else if (connState === 'disconnected' || connState === 'closed') {
+                syncManager.cancel();
             }
-        }));
-    }
-}
+        },
 
-// === WebSocket ===
+        onParticipantsUpdate: (participantCount, readyCount, syncForClientId) => {
+            console.log(`Participants: ${participantCount}, Ready: ${readyCount}`);
+            updatePresence(participantCount, readyCount);
+            updateQuorumBanner(participantCount, readyCount);
 
-let ws = null;
-let reconnectAttempts = 0;
-const maxReconnectAttempts = 10;
+            // If a new client joined, send them our state
+            if (syncForClientId) {
+                connection.send({
+                    type: 'syncState',
+                    targetClientId: syncForClientId,
+                    state: state
+                });
+            }
+        },
 
-function connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/board/${boardId}/ws`;
-
-    try {
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-            reconnectAttempts = 0;
-            updateConnectionStatus('connected', 'Connected - changes sync in real-time');
-            ws.send(JSON.stringify({ type: 'requestSync' }));
-        };
-
-        ws.onclose = (event) => {
-            ws = null;
-            if (event.code === 4000) {
-                updateConnectionStatus('disconnected', 'Board is full (max 20 participants)');
+        onMessage: (message) => {
+            // Handle sync-related messages
+            if (message.type === 'syncState') {
+                syncManager.handleSyncState(message.state);
                 return;
             }
 
-            if (reconnectAttempts < maxReconnectAttempts) {
-                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-                reconnectAttempts++;
-                updateConnectionStatus('disconnected', `Disconnected - reconnecting in ${Math.round(delay / 1000)}s...`);
-                setTimeout(connectWebSocket, delay);
-            } else {
-                updateConnectionStatus('disconnected', 'Disconnected - refresh to reconnect');
+            if (message.type === 'requestSync') {
+                // Another client wants our state
+                connection.send({
+                    type: 'syncState',
+                    state: state
+                });
+                return;
             }
-        };
 
-        ws.onerror = () => {
-            // Error will trigger onclose
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const operation = JSON.parse(event.data);
-                applyRemoteOperation(operation);
-            } catch (e) {
-                console.error('Failed to parse message:', e);
+            // For operations, check dedup and sync buffering
+            if (message.type === 'cardOp') {
+                if (message.opId && dedup.isDuplicate(message.opId)) {
+                    return; // Already processed
+                }
+                if (syncManager.handleOperation(message)) {
+                    return; // Buffered during sync
+                }
+                applyCardOpAndPersist(message);
+                return;
             }
-        };
-    } catch (e) {
-        console.log('WebSocket not available, running in local-only mode');
-        updateConnectionStatus('disconnected', 'Local mode - no real-time sync');
+
+            if (message.type === 'vote') {
+                if (message.opId && dedup.isDuplicate(message.opId)) {
+                    return; // Already processed
+                }
+                if (syncManager.handleOperation(message)) {
+                    return; // Buffered during sync
+                }
+                applyVoteAndPersist(message);
+                return;
+            }
+
+            if (message.type === 'phaseChanged') {
+                if (message.phase === 'reviewing') {
+                    enterReviewPhase();
+                }
+                return;
+            }
+
+            console.log('Received:', message);
+        },
+
+        onError: (error) => {
+            console.error('Connection error:', error);
+            // TODO: Show error to user
+        }
+    });
+
+    // Start connection
+    connection.connect();
+
+    // Reconnect button
+    document.getElementById('reconnect-btn').addEventListener('click', () => {
+        connection.reconnect();
+    });
+
+    // Back to boards
+    document.getElementById('back-to-boards').addEventListener('click', (e) => {
+        if (cardInputText.value.trim()) {
+            e.preventDefault();
+            if (confirm('You have unsaved text in the editor. Leave anyway?')) {
+                window.location.href = '/';
+            }
+        }
+    });
+
+    // Ready button
+    readyBtn.addEventListener('click', () => {
+        isReady = !isReady;
+        readyBtn.classList.toggle('active', isReady);
+        connection.send({ type: 'setReady', ready: isReady });
+    });
+
+    // Quorum banner
+    const quorumWrapper = document.getElementById('quorum-banner-wrapper');
+    document.getElementById('start-review-btn').addEventListener('click', () => {
+        if (!confirm('Start the review phase?\n\nThis cannot be undone. Columns and votes will be frozen for all participants.')) {
+            return;
+        }
+        connection.broadcast({ type: 'phaseChanged', phase: 'reviewing' });
+        enterReviewPhase();
+    });
+
+    function updateQuorumBanner(participantCount, readyCount) {
+        const needed = quorumNeeded(participantCount);
+        const reached = participantCount > 0 && readyCount >= needed;
+        quorumWrapper.classList.toggle('visible', reached);
     }
-}
 
-function broadcastOperation(operation) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(operation));
+    function enterReviewPhase() {
+        state.phase = 'reviewing';
+        currentPhase = 'reviewing';
+        saveBoard(boardId, state);
+
+        // Hide forming-phase UI
+        document.querySelector('.card-input').style.display = 'none';
+        quorumWrapper.classList.remove('visible');
+        readyBtn.style.display = 'none';
+
+        // Hide ready count from presence
+        document.getElementById('ready-count').innerHTML = '';
+
+        // Show phase chip and export button
+        document.getElementById('phase-chip').style.display = '';
+        document.getElementById('download-btn').style.display = '';
+
+        renderBoard();
     }
-}
 
-function updateConnectionStatus(status, message = '') {
-    const indicator = document.getElementById('connection-status');
-    indicator.className = `status-indicator ${status}`;
-    indicator.title = message;
-}
+    function formatCardMarkdown(card) {
+        const votes = getVoteCount(state, card.id);
+        const voteLabel = votes === 1 ? '1 vote' : `${votes} votes`;
+        const lines = card.text.split('\n');
+        const first = `- ${lines[0]}`;
+        const rest = lines.slice(1).map(line => line ? `  ${line}` : '');
+        return [first, ...rest].join('\n\n') + ` (${voteLabel})\n`;
+    }
 
-// === Rendering ===
+    function generateMarkdown() {
+        const wellCards = getVisibleCards(state, 'well')
+            .sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
+        const deltaCards = getVisibleCards(state, 'delta')
+            .sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
 
-function renderCards() {
-    const wellContainer = document.getElementById('well-cards');
-    const deltaContainer = document.getElementById('delta-cards');
+        let md = `# ${boardId}\n\n`;
 
-    wellContainer.innerHTML = '';
-    deltaContainer.innerHTML = '';
-
-    const wellCards = ops.getCardsByColumn(state, 'well');
-    const deltaCards = ops.getCardsByColumn(state, 'delta');
-
-    wellCards.forEach(card => wellContainer.appendChild(createCardElement(card)));
-    deltaCards.forEach(card => deltaContainer.appendChild(createCardElement(card)));
-}
-
-function createCardElement(card) {
-    const div = document.createElement('div');
-    div.className = 'card';
-    div.dataset.cardId = card.id;
-
-    const voteCount = ops.getVoteCount(state, card.id);
-    const hasVoted = ops.hasVoted(state, card.id, clientId);
-    const isOwner = card.owner === clientId;
-
-    // Build controls based on ownership and vote status
-    let controlsHtml = '';
-    if (isOwner) {
-        controlsHtml = `
-            <button class="card-control edit-btn">✏️ Edit</button>
-            <button class="card-control delete-btn">🗑️ Delete</button>
-        `;
-    } else {
-        if (hasVoted) {
-            controlsHtml = `<button class="card-control vote-btn voted">Remove vote</button>`;
+        md += '## What Went Well\n\n';
+        if (wellCards.length === 0) {
+            md += '_No cards._\n';
         } else {
-            controlsHtml = `<button class="card-control vote-btn">👍 Vote</button>`;
+            for (const card of wellCards) {
+                md += formatCardMarkdown(card);
+            }
         }
+
+        md += '\n## Delta\n\n';
+        if (deltaCards.length === 0) {
+            md += '_No cards._\n';
+        } else {
+            for (const card of deltaCards) {
+                md += formatCardMarkdown(card);
+            }
+        }
+
+        return md;
     }
 
-    div.innerHTML = `
-        <div class="card-body">
-            <div class="card-content">${escapeHtml(card.text)}</div>
-            ${voteCount > 0 ? `<div class="card-votes">+${voteCount}</div>` : ''}
-        </div>
-        <div class="card-controls">
-            ${controlsHtml}
-        </div>
-    `;
+    document.getElementById('download-btn').addEventListener('click', () => {
+        const md = generateMarkdown();
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${boardId}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
 
-    const content = div.querySelector('.card-content');
+    // Store for debugging
+    window._connection = connection;
+    window._state = () => state;
 
-    // Edit button click handler (for owners)
-    const editBtn = div.querySelector('.edit-btn');
-    if (editBtn) {
-        editBtn.addEventListener('click', () => {
-            content.contentEditable = 'true';
-            content.focus();
-        });
+    // Initial render
+    renderBoard();
 
-        content.addEventListener('blur', () => {
-            content.contentEditable = 'false';
-            const newText = content.innerText.trim();
-            if (newText && newText !== card.text) {
-                editCard(card.id, newText);
+    // If board was already in reviewing phase (e.g. page reload), apply review UI
+    if (state.phase === 'reviewing') {
+        enterReviewPhase();
+    }
+
+    // Card input: update button states based on textarea content
+    function updateAddButtonStates() {
+        const hasText = cardInputText.value.trim().length > 0;
+        addWellBtn.disabled = !hasText;
+        addDeltaBtn.disabled = !hasText;
+    }
+
+    cardInputText.addEventListener('input', updateAddButtonStates);
+    updateAddButtonStates(); // Initial state
+
+    // Card input: color feedback on button hover
+    addWellBtn.addEventListener('mouseenter', () => {
+        cardInputText.classList.add('aim-well');
+    });
+    addWellBtn.addEventListener('mouseleave', () => {
+        cardInputText.classList.remove('aim-well');
+    });
+    addDeltaBtn.addEventListener('mouseenter', () => {
+        cardInputText.classList.add('aim-delta');
+    });
+    addDeltaBtn.addEventListener('mouseleave', () => {
+        cardInputText.classList.remove('aim-delta');
+    });
+
+    // Card input: submit handlers
+    function submitCard(column) {
+        const text = cardInputText.value.trim();
+        if (!text) return;
+
+        let op;
+        if (editingCard) {
+            // Editing existing card
+            op = {
+                type: 'cardOp',
+                cardId: editingCard.id,
+                column: column,
+                text: text,
+                authorId: editingCard.authorId,
+                rev: editingCard.rev + 1,
+                isDeleted: false
+            };
+        } else {
+            // Creating new card
+            const card = createCard(column, text, connection.getClientId());
+            op = {
+                type: 'cardOp',
+                cardId: card.id,
+                column: card.column,
+                text: card.text,
+                authorId: card.authorId,
+                rev: card.rev,
+                isDeleted: card.isDeleted
+            };
+        }
+
+        applyCardOpAndPersist(op);
+        const opId = connection.broadcast(op);
+        dedup.markSeen(opId);
+
+        // Clear editing state and input
+        clearEditingState();
+    }
+
+    function clearEditingState() {
+        editingCard = null;
+        cardInputText.value = '';
+        cardInputText.classList.remove('editing-well', 'editing-delta');
+        cardInputBar.classList.remove('editing-well', 'editing-delta');
+        cardInputBarLabel.textContent = 'Add card';
+        cardInputCancel.style.display = 'none';
+        editOverlay.classList.remove('active');
+        wellBtnLabel.textContent = 'Add to Went Well';
+        deltaBtnLabel.textContent = 'Add to Delta';
+        updateAddButtonStates();
+    }
+
+    cardInputCancel.addEventListener('click', () => {
+        clearEditingState();
+        cardInputText.blur();
+    });
+
+    editOverlay.addEventListener('click', () => {
+        clearEditingState();
+        cardInputText.blur();
+    });
+
+    addWellBtn.addEventListener('click', () => submitCard('well'));
+    addDeltaBtn.addEventListener('click', () => submitCard('delta'));
+
+    // Keyboard shortcuts: Ctrl+Enter for Well, Ctrl+Shift+Enter for Delta, Escape to cancel
+    cardInputText.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            clearEditingState();
+            cardInputText.blur();
+            return;
+        }
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            if (e.shiftKey) {
+                submitCard('delta');
             } else {
-                content.innerText = card.text;
+                submitCard('well');
             }
-        });
-
-        content.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                content.blur();
-            }
-            if (e.key === 'Escape') {
-                content.innerText = card.text;
-                content.blur();
-            }
-        });
-    }
-
-    // Vote button (only for non-owners)
-    const voteBtn = div.querySelector('.vote-btn');
-    if (voteBtn) {
-        voteBtn.addEventListener('click', () => toggleVote(card.id));
-    }
-
-    const deleteBtn = div.querySelector('.delete-btn');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', () => {
-            if (confirm('Delete this card? This cannot be undone.')) {
-                deleteCard(card.id);
-            }
-        });
-    }
-
-    return div;
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// === Export ===
-
-function exportToMarkdown() {
-    const wellCards = ops.getCardsByColumn(state, 'well');
-    const deltaCards = ops.getCardsByColumn(state, 'delta');
-
-    let markdown = `# Retrospective - ${new Date().toLocaleDateString()}\n\n`;
-
-    markdown += `## What Went Well\n\n`;
-    wellCards.forEach(card => {
-        const votes = ops.getVoteCount(state, card.id);
-        markdown += `- ${card.text}${votes > 0 ? ` (${votes} vote${votes > 1 ? 's' : ''})` : ''}\n`;
+        }
     });
 
-    markdown += `\n## Delta (What to Adjust)\n\n`;
-    deltaCards.forEach(card => {
-        const votes = ops.getVoteCount(state, card.id);
-        markdown += `- ${card.text}${votes > 0 ? ` (${votes} vote${votes > 1 ? 's' : ''})` : ''}\n`;
-    });
+    function applyCardOpAndPersist(op) {
+        state = applyCardOp(state, op);
+        persistAndRender();
+    }
 
-    const blob = new Blob([markdown], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `retrospective-${new Date().toISOString().split('T')[0]}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
+    function applyVoteAndPersist(op) {
+        state = applyVote(state, op);
+        persistAndRender();
+    }
 
-// === Board Initialization ===
+    function persistAndRender() {
+        saveBoard(boardId, state);
+        renderBoard();
+    }
 
-function initBoard(id) {
-    boardId = id;
-    clientId = getClientId();
-    state = loadState(boardId);
+    function renderBoard() {
+        renderColumn(wellCardsEl, 'well');
+        renderColumn(deltaCardsEl, 'delta');
+    }
 
-    // Show board page, hide landing
-    document.getElementById('landing-page').style.display = 'none';
-    document.getElementById('board-page').style.display = '';
+    function renderColumn(container, column) {
+        container.innerHTML = '';
+        const cards = getVisibleCards(state, column);
 
-    // Hide tagline on board view
-    document.getElementById('header-tagline').style.display = 'none';
+        // In review phase, sort by vote count descending
+        if (state.phase === 'reviewing') {
+            cards.sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
+        }
 
-    document.getElementById('board-title').textContent = `Delta Board - ${boardId}`;
-
-    document.querySelectorAll('.btn-add').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const column = btn.dataset.column;
-            const text = prompt('Enter card text:');
-            if (text?.trim()) {
-                createCard(column, text.trim());
-            }
-        });
-    });
-
-    document.getElementById('export-btn').addEventListener('click', exportToMarkdown);
-
-    renderCards();
-    connectWebSocket();
-}
-
-// === Initialization ===
-
-document.addEventListener('DOMContentLoaded', () => {
-    if (isLandingPage()) {
-        // Show landing page, hide board
-        document.getElementById('landing-page').style.display = '';
-        document.getElementById('board-page').style.display = 'none';
-        // Hide board-specific header elements
-        document.querySelector('.header-actions').style.display = 'none';
-        initLandingPage();
-    } else {
-        const id = getBoardId();
-        if (id) {
-            initBoard(id);
+        for (const card of cards) {
+            container.appendChild(renderCard(card));
         }
     }
-});
+
+    function renderCard(card) {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.dataset.cardId = card.id;
+
+        // Card body with content and vote button
+        const body = document.createElement('div');
+        body.className = 'card-body';
+
+        const content = document.createElement('div');
+        content.className = 'card-content';
+        content.textContent = card.text;
+
+        const clientId = connection.getClientId();
+        const voted = hasVoted(state, card.id, clientId);
+        const voteCount = getVoteCount(state, card.id);
+
+        const isReviewing = state.phase === 'reviewing';
+
+        if (isReviewing) {
+            // Static vote count display
+            const voteBadge = document.createElement('span');
+            voteBadge.className = 'card-votes';
+            voteBadge.textContent = String(voteCount);
+
+            body.appendChild(content);
+            body.appendChild(voteBadge);
+            el.appendChild(body);
+            return el;
+        }
+
+        const voteBtn = document.createElement('button');
+        voteBtn.className = 'card-votes' + (voted ? ' voted' : '');
+        voteBtn.textContent = String(voteCount);
+        voteBtn.title = voted ? 'Remove vote' : 'Vote';
+        voteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleVote(card, voted);
+        });
+
+        body.appendChild(content);
+        body.appendChild(voteBtn);
+        el.appendChild(body);
+
+        // Card actions (edit/delete) at bottom - only for own cards
+        const isOwnCard = card.authorId === clientId;
+        if (isOwnCard) {
+            const actions = document.createElement('div');
+            actions.className = 'card-actions';
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn-card-action';
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleEditCard(card);
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-card-action btn-delete';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleDeleteCard(card);
+            });
+
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
+            el.appendChild(actions);
+        }
+
+        return el;
+    }
+
+    function handleVote(card, currentlyVoted) {
+        const clientId = connection.getClientId();
+
+        // Find existing vote to get current rev
+        const voteId = `${card.id}:${clientId}`;
+        const existingVote = state.votes.find(v => v.id === voteId);
+        const currentRev = existingVote ? existingVote.rev : 0;
+
+        const op = {
+            type: 'vote',
+            cardId: card.id,
+            voterId: clientId,
+            rev: currentRev + 1,
+            isDeleted: currentlyVoted // Toggle: if voted, now remove; if not voted, add
+        };
+
+        applyVoteAndPersist(op);
+        const opId = connection.broadcast(op);
+        dedup.markSeen(opId);
+    }
+
+    function handleEditCard(card) {
+        // Set editing state
+        editingCard = card;
+
+        // Load card text into textarea
+        cardInputText.value = card.text;
+
+        // Apply column-specific styling
+        const editClass = card.column === 'well' ? 'editing-well' : 'editing-delta';
+        cardInputText.classList.remove('editing-well', 'editing-delta');
+        cardInputText.classList.add(editClass);
+        cardInputBar.classList.remove('editing-well', 'editing-delta');
+        cardInputBar.classList.add(editClass);
+
+        // Update bar and buttons
+        cardInputBarLabel.textContent = card.column === 'well' ? 'Editing \u00b7 What Went Well' : 'Editing \u00b7 Delta';
+        cardInputCancel.style.display = '';
+        wellBtnLabel.textContent = 'Save to Went Well';
+        deltaBtnLabel.textContent = 'Save to Delta';
+
+        // Update button states
+        updateAddButtonStates();
+
+        // Show overlay
+        editOverlay.classList.add('active');
+
+        // Focus and select all text
+        cardInputText.focus();
+        cardInputText.select();
+
+        // Scroll to input
+        cardInputText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function handleDeleteCard(card) {
+        if (!window.confirm('Delete this card?')) return;
+
+        const op = {
+            type: 'cardOp',
+            cardId: card.id,
+            column: card.column,
+            text: card.text,
+            authorId: card.authorId,
+            rev: card.rev + 1,
+            isDeleted: true
+        };
+
+        applyCardOpAndPersist(op);
+        const opId = connection.broadcast(op);
+        dedup.markSeen(opId);
+
+        // Delete all votes on this card
+        for (const vote of state.votes) {
+            if (vote.cardId === card.id && !vote.isDeleted) {
+                const voteOp = {
+                    type: 'vote',
+                    cardId: vote.cardId,
+                    voterId: vote.voterId,
+                    rev: vote.rev + 1,
+                    isDeleted: true
+                };
+                applyVoteAndPersist(voteOp);
+                const voteOpId = connection.broadcast(voteOp);
+                dedup.markSeen(voteOpId);
+            }
+        }
+    }
+}
+
+/**
+ * Calculate the readiness quorum needed for a given participant count
+ * @param {number} participantCount
+ * @returns {number}
+ */
+function quorumNeeded(participantCount) {
+    if (participantCount <= 2) return participantCount;
+    return Math.ceil(0.6 * participantCount);
+}
+
+/**
+ * Animate a number element with a tick effect when the value changes
+ * @param {HTMLElement} numEl
+ * @param {number} value
+ */
+function animateNumber(numEl, value) {
+    if (numEl.textContent !== String(value)) {
+        numEl.textContent = value;
+        numEl.classList.remove('tick');
+        void numEl.offsetWidth;
+        numEl.classList.add('tick');
+    }
+}
+
+/**
+ * Update presence display (participant count + ready count)
+ * @param {number} participantCount
+ * @param {number} readyCount
+ */
+function updatePresence(participantCount, readyCount) {
+    const el = document.getElementById('participant-count');
+    const numEl = document.getElementById('participant-number');
+    const readyEl = document.getElementById('ready-count');
+
+    if (participantCount > 0) {
+        animateNumber(numEl, participantCount);
+
+        if (readyCount > 0 && currentPhase !== 'reviewing') {
+            // Build ready count with animatable number span
+            let readyNumEl = readyEl.querySelector('.ready-number');
+            if (!readyNumEl) {
+                readyEl.innerHTML = ' \u00b7 <span class="ready-number"></span> ready';
+                readyNumEl = readyEl.querySelector('.ready-number');
+            }
+            animateNumber(readyNumEl, readyCount);
+        } else {
+            readyEl.innerHTML = '';
+        }
+
+        el.style.display = '';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+/**
+ * Update connection status indicator
+ * @param {HTMLElement} el
+ * @param {string} state
+ */
+function updateConnectionStatus(el, state) {
+    const tooltips = {
+        disconnected: 'Reconnecting',
+        connecting: 'Reconnecting',
+        handshaking: 'Reconnecting',
+        ready: 'Connected and syncing changes',
+        closed: 'Disconnected'
+    };
+
+    const classes = {
+        disconnected: 'status-indicator connecting',
+        connecting: 'status-indicator connecting',
+        handshaking: 'status-indicator connecting',
+        ready: 'status-indicator connected',
+        closed: 'status-indicator disconnected'
+    };
+
+    el.textContent = '';
+    el.className = classes[state] || 'status-indicator';
+    el.title = tooltips[state] || '';
+
+    // Show reconnect button only when permanently disconnected
+    const reconnectBtn = document.getElementById('reconnect-btn');
+    reconnectBtn.style.display = state === 'closed' ? '' : 'none';
+
+    // Hide presence, ready button, and quorum banner when disconnected
+    if (state === 'closed') {
+        updatePresence(0, 0);
+        document.getElementById('ready-btn').style.display = 'none';
+        document.getElementById('quorum-banner-wrapper').classList.remove('visible');
+    } else if (state === 'ready' && currentPhase !== 'reviewing') {
+        document.getElementById('ready-btn').style.display = '';
+    }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', init);
