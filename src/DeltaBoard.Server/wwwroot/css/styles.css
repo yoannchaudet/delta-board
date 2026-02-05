@@ -409,6 +409,12 @@ header {
     font-weight: 600;
 }
 
+.column-subtitle {
+    font-size: 0.775rem;
+    color: var(--color-text-light);
+    margin-top: 0.125rem;
+}
+
 .cards {
     display: flex;
     flex-direction: column;
