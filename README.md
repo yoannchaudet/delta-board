@@ -62,7 +62,7 @@ cd src/DeltaBoard.Server
 dotnet run
 ```
 
-The server starts at `http://localhost:5173` and serves both the web application and WebSocket API.
+The server starts at `http://localhost:5123` and serves both the web application and WebSocket API.
 
 ### Run Tests
 
@@ -74,6 +74,18 @@ dotnet test
 npm install
 npm test
 ```
+
+### Run with Docker
+
+```bash
+# Build the image
+docker build -t delta-board .
+
+# Run it
+docker run -p 8080:8080 delta-board
+```
+
+The server starts at `http://localhost:8080`. The container listens on port 8080 by default (configurable via `ASPNETCORE_HTTP_PORTS`).
 
 ## CI
 

@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+docs
+tests
+node_modules
+**/bin
+**/obj
+*.md
+LICENSE
+.gitignore
+.dockerignore
+vitest.config.js
+package.json
+package-lock.json

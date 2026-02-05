@@ -56,6 +56,23 @@ Boards use human-readable URLs with collision-resistant hashing:
 - **Board ID format**: `{adjective}-{noun}-{hash}` (e.g., `cosmic-waffle-x7k2`)
 - **Total combinations**: 20 adjectives × 20 nouns × 36⁴ = 671,846,400 unique boards
 
+## Container Deployment
+
+The server is packaged as a multi-stage Docker image (Alpine-based, self-contained single-file publish).
+
+- **Local development**: `dotnet run` reads `launchSettings.json` and binds to `http://localhost:5123`
+- **Container**: No Kestrel override in `appsettings.json`, so .NET defaults to port 8080 on all interfaces
+- **Port override**: Set `ASPNETCORE_HTTP_PORTS` environment variable to change the listening port
+
+### Azure Container Apps
+
+When deploying to Azure Container Apps:
+
+- Set ingress transport to **HTTP** (HTTP/1.1) — `auto` and `http2` break WebSocket upgrades
+- Set target port to **8080** to match the container's default listening port
+- The app implements ping/pong keepalives (30s interval) which prevents Azure's 240s idle timeout from disconnecting WebSocket clients
+- Enable sticky sessions if scaling to multiple replicas
+
 ## Limitations by Design
 
 - Maximum 20 concurrent participants per board

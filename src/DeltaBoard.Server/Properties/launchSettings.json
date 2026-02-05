@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DeltaBoard.Server": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5123"
+    }
+  }
+}
