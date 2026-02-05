@@ -82,8 +82,12 @@ function initBoard(boardId) {
     let isReady = false;
     const readyBtn = document.getElementById('ready-btn');
 
-    // Load persisted state or create empty
-    let state = loadBoard(boardId) || createEmptyState();
+    // Load persisted state or create empty (and persist immediately for new boards)
+    let state = loadBoard(boardId);
+    if (!state) {
+        state = createEmptyState();
+        saveBoard(boardId, state);
+    }
 
     // Create deduplication tracker
     const dedup = createDedup();
