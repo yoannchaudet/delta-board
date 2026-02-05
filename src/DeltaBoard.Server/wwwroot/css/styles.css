@@ -128,7 +128,7 @@ header {
 }
 
 .ready-count {
-    display: inline-block;
+    display: inline;
 }
 
 .ready-count .ready-number {
