@@ -581,15 +581,18 @@ header {
     min-width: 2.5rem;
     text-align: center;
     border: none;
+}
+
+button.card-votes {
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.card-votes:hover {
+button.card-votes:hover {
     transform: scale(1.1);
 }
 
-.card-votes:active {
+button.card-votes:active {
     transform: scale(0.95);
 }
 

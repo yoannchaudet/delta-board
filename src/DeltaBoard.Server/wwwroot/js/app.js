@@ -8,6 +8,9 @@ import { saveBoard, loadBoard } from './storage.js';
 import { createSyncManager } from './sync.js';
 import { createDedup } from './dedup.js';
 
+// Module-level phase so status functions can check it
+let currentPhase = 'forming';
+
 /**
  * Detect current page from URL
  * @returns {'landing' | 'board'}
@@ -90,8 +93,12 @@ function initBoard(boardId) {
         () => state,
         {
             onStateReady: (newState) => {
+                const wasForming = state.phase === 'forming';
                 state = newState;
                 persistAndRender();
+                if (wasForming && state.phase === 'reviewing') {
+                    enterReviewPhase();
+                }
             },
             onBroadcastState: (stateToSend) => {
                 connection.send({
@@ -180,6 +187,13 @@ function initBoard(boardId) {
                 return;
             }
 
+            if (message.type === 'phaseChanged') {
+                if (message.phase === 'reviewing') {
+                    enterReviewPhase();
+                }
+                return;
+            }
+
             console.log('Received:', message);
         },
 
@@ -220,8 +234,8 @@ function initBoard(boardId) {
         if (!confirm('Start the review phase?\n\nThis cannot be undone. Columns and votes will be frozen for all participants.')) {
             return;
         }
-        // TODO: broadcast phase change
-        console.log('Review phase started');
+        connection.broadcast({ type: 'phaseChanged', phase: 'reviewing' });
+        enterReviewPhase();
     });
 
     function updateQuorumBanner(participantCount, readyCount) {
@@ -230,12 +244,33 @@ function initBoard(boardId) {
         quorumWrapper.classList.toggle('visible', reached);
     }
 
+    function enterReviewPhase() {
+        state.phase = 'reviewing';
+        currentPhase = 'reviewing';
+        saveBoard(boardId, state);
+
+        // Hide forming-phase UI
+        document.querySelector('.card-input').style.display = 'none';
+        quorumWrapper.classList.remove('visible');
+        readyBtn.style.display = 'none';
+
+        // Hide ready count from presence
+        document.getElementById('ready-count').innerHTML = '';
+
+        renderBoard();
+    }
+
     // Store for debugging
     window._connection = connection;
     window._state = () => state;
 
     // Initial render
     renderBoard();
+
+    // If board was already in reviewing phase (e.g. page reload), apply review UI
+    if (state.phase === 'reviewing') {
+        enterReviewPhase();
+    }
 
     // Card input: update button states based on textarea content
     function updateAddButtonStates() {
@@ -367,6 +402,12 @@ function initBoard(boardId) {
     function renderColumn(container, column) {
         container.innerHTML = '';
         const cards = getVisibleCards(state, column);
+
+        // In review phase, sort by vote count descending
+        if (state.phase === 'reviewing') {
+            cards.sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
+        }
+
         for (const card of cards) {
             container.appendChild(renderCard(card));
         }
@@ -388,6 +429,20 @@ function initBoard(boardId) {
         const clientId = connection.getClientId();
         const voted = hasVoted(state, card.id, clientId);
         const voteCount = getVoteCount(state, card.id);
+
+        const isReviewing = state.phase === 'reviewing';
+
+        if (isReviewing) {
+            // Static vote count display
+            const voteBadge = document.createElement('span');
+            voteBadge.className = 'card-votes';
+            voteBadge.textContent = String(voteCount);
+
+            body.appendChild(content);
+            body.appendChild(voteBadge);
+            el.appendChild(body);
+            return el;
+        }
 
         const voteBtn = document.createElement('button');
         voteBtn.className = 'card-votes' + (voted ? ' voted' : '');
@@ -543,7 +598,7 @@ function updatePresence(participantCount, readyCount) {
     if (participantCount > 0) {
         animateNumber(numEl, participantCount);
 
-        if (readyCount > 0) {
+        if (readyCount > 0 && currentPhase !== 'reviewing') {
             // Build ready count with animatable number span
             let readyNumEl = readyEl.querySelector('.ready-number');
             if (!readyNumEl) {
@@ -596,7 +651,7 @@ function updateConnectionStatus(el, state) {
         updatePresence(0, 0);
         document.getElementById('ready-btn').style.display = 'none';
         document.getElementById('quorum-banner-wrapper').classList.remove('visible');
-    } else if (state === 'ready') {
+    } else if (state === 'ready' && currentPhase !== 'reviewing') {
         document.getElementById('ready-btn').style.display = '';
     }
 }
