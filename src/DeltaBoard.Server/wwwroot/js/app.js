@@ -42,6 +42,8 @@ function init() {
         document.getElementById('landing-page').style.display = 'none';
         document.getElementById('board-page').style.display = 'grid';
         document.getElementById('header-tagline').style.display = 'none';
+        document.getElementById('landing-title').style.display = 'none';
+        document.getElementById('board-breadcrumb').style.display = '';
 
         const boardId = getBoardId();
         document.getElementById('board-title').textContent = boardId;
@@ -185,6 +187,16 @@ function initBoard(boardId) {
     // Reconnect button
     document.getElementById('reconnect-btn').addEventListener('click', () => {
         connection.reconnect();
+    });
+
+    // Back to boards
+    document.getElementById('back-to-boards').addEventListener('click', (e) => {
+        if (cardInputText.value.trim()) {
+            e.preventDefault();
+            if (confirm('You have unsaved text in the editor. Leave anyway?')) {
+                window.location.href = '/';
+            }
+        }
     });
 
     // Store for debugging
