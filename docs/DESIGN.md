@@ -39,7 +39,8 @@ CRDTs may be used as a future implementation detail, but the current design reli
 ### Local Storage Schema
 
 Client state is persisted in localStorage using a versioned schema.
-Clients should store a `schemaVersion` alongside board data and reset or migrate when the stored version is unsupported.
+Each board carries a `version` field (currently `1`). Boards loaded without a version are treated as version `1`.
+When the schema changes in the future, clients can migrate or reset boards with an unsupported version.
 
 ## URL Format
 

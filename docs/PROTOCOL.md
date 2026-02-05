@@ -123,6 +123,7 @@ All messages are JSON objects sent over the WebSocket connection.
 {
   "type": "syncState",
   "targetClientId": "...",
+  "version": 1,
   "phase": "forming",
   "cards": [
     {
@@ -140,6 +141,7 @@ All messages are JSON objects sent over the WebSocket connection.
 
 - `type` (string, required)
 - `targetClientId` (string, optional; when omitted, server broadcasts to all clients except the sender)
+- `version` (number, required; board schema version, currently `1`)
 - `phase` (string, required)
 - `cards` (array, required)
   - `id` (string, required)

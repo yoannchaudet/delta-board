@@ -151,8 +151,12 @@ export function mergeState(local, remote) {
         }
     }
 
+    // Use the higher version (or default to 1)
+    const mergedVersion = Math.max(local.version || 1, remote.version || 1);
+
     return {
         state: {
+            version: mergedVersion,
             phase: mergedPhase,
             cards: Array.from(cardMap.values()),
             votes: Array.from(voteMap.values())

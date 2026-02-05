@@ -31,10 +31,14 @@ import { generateCardId } from './board.js';
 
 /**
  * @typedef {Object} BoardState
+ * @property {number} version - Schema version
  * @property {Phase} phase - Current board phase
  * @property {Card[]} cards - All cards (including tombstones)
  * @property {Vote[]} votes - All votes (including tombstones)
  */
+
+/** Current board state schema version */
+export const BOARD_VERSION = 1;
 
 /**
  * Create an empty board state
@@ -42,6 +46,7 @@ import { generateCardId } from './board.js';
  */
 export function createEmptyState() {
     return {
+        version: BOARD_VERSION,
         phase: 'forming',
         cards: [],
         votes: []

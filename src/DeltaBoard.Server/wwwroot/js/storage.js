@@ -125,6 +125,7 @@ export function loadBoard(boardId) {
             return null;
         }
         return {
+            version: data.version || 1,
             phase: data.phase,
             cards: data.cards,
             votes: data.votes
