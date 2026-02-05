@@ -122,6 +122,35 @@ header {
     gap: 1rem;
 }
 
+.btn-ready {
+    padding: 0.3rem 0.75rem;
+    border: none;
+    border-radius: var(--radius);
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.btn-ready:hover {
+    background-color: #c8e6c9;
+}
+
+.btn-ready.active {
+    background-color: #a5d6a7;
+    color: #1b5e20;
+}
+
+.btn-ready-check {
+    display: none;
+}
+
+.btn-ready.active .btn-ready-check {
+    display: inline;
+}
+
 .participant-count {
     font-size: 0.8rem;
     color: var(--color-text-light);
@@ -133,6 +162,18 @@ header {
 }
 
 .participant-number.tick {
+    animation: tick 0.3s ease-out;
+}
+
+.ready-count {
+    display: inline-block;
+}
+
+.ready-count .ready-number {
+    display: inline-block;
+}
+
+.ready-count .ready-number.tick {
     animation: tick 0.3s ease-out;
 }
 

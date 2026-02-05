@@ -75,6 +75,10 @@ function initBoard(boardId) {
     // Editing state - null when creating new, card object when editing
     let editingCard = null;
 
+    // Ready state
+    let isReady = false;
+    const readyBtn = document.getElementById('ready-btn');
+
     // Load persisted state or create empty
     let state = loadBoard(boardId) || createEmptyState();
 
@@ -112,6 +116,9 @@ function initBoard(boardId) {
         onStateChange: (connState) => {
             updateConnectionStatus(statusEl, connState);
             if (connState === 'ready') {
+                // Reset ready state (server forgets on reconnect)
+                isReady = false;
+                readyBtn.classList.remove('active');
                 // Start sync window when connection becomes ready
                 syncManager.startSync();
             } else if (connState === 'disconnected' || connState === 'closed') {
@@ -121,7 +128,7 @@ function initBoard(boardId) {
 
         onParticipantsUpdate: (participantCount, readyCount, syncForClientId) => {
             console.log(`Participants: ${participantCount}, Ready: ${readyCount}`);
-            updateParticipantCount(participantCount);
+            updatePresence(participantCount, readyCount);
 
             // If a new client joined, send them our state
             if (syncForClientId) {
@@ -197,6 +204,13 @@ function initBoard(boardId) {
                 window.location.href = '/';
             }
         }
+    });
+
+    // Ready button
+    readyBtn.addEventListener('click', () => {
+        isReady = !isReady;
+        readyBtn.classList.toggle('active', isReady);
+        connection.send({ type: 'setReady', ready: isReady });
     });
 
     // Store for debugging
@@ -476,21 +490,44 @@ function initBoard(boardId) {
 }
 
 /**
- * Update participant count display
- * @param {number} count
+ * Animate a number element with a tick effect when the value changes
+ * @param {HTMLElement} numEl
+ * @param {number} value
  */
-function updateParticipantCount(count) {
+function animateNumber(numEl, value) {
+    if (numEl.textContent !== String(value)) {
+        numEl.textContent = value;
+        numEl.classList.remove('tick');
+        void numEl.offsetWidth;
+        numEl.classList.add('tick');
+    }
+}
+
+/**
+ * Update presence display (participant count + ready count)
+ * @param {number} participantCount
+ * @param {number} readyCount
+ */
+function updatePresence(participantCount, readyCount) {
     const el = document.getElementById('participant-count');
     const numEl = document.getElementById('participant-number');
-    if (count > 0) {
-        // Animate only when the number actually changes
-        if (numEl.textContent !== String(count)) {
-            numEl.textContent = count;
-            numEl.classList.remove('tick');
-            // Force reflow so re-adding the class restarts the animation
-            void numEl.offsetWidth;
-            numEl.classList.add('tick');
+    const readyEl = document.getElementById('ready-count');
+
+    if (participantCount > 0) {
+        animateNumber(numEl, participantCount);
+
+        if (readyCount > 0) {
+            // Build ready count with animatable number span
+            let readyNumEl = readyEl.querySelector('.ready-number');
+            if (!readyNumEl) {
+                readyEl.innerHTML = ' \u00b7 <span class="ready-number"></span> ready';
+                readyNumEl = readyEl.querySelector('.ready-number');
+            }
+            animateNumber(readyNumEl, readyCount);
+        } else {
+            readyEl.innerHTML = '';
         }
+
         el.style.display = '';
     } else {
         el.style.display = 'none';
@@ -527,9 +564,12 @@ function updateConnectionStatus(el, state) {
     const reconnectBtn = document.getElementById('reconnect-btn');
     reconnectBtn.style.display = state === 'closed' ? '' : 'none';
 
-    // Hide participant count when disconnected
+    // Hide presence and ready button when disconnected
     if (state === 'closed') {
-        updateParticipantCount(0);
+        updatePresence(0, 0);
+        document.getElementById('ready-btn').style.display = 'none';
+    } else if (state === 'ready') {
+        document.getElementById('ready-btn').style.display = '';
     }
 }
 
