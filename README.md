@@ -62,7 +62,7 @@ cd src/DeltaBoard.Server
 dotnet run
 ```
 
-The server starts at `http://localhost:5173` and serves both the web application and WebSocket API.
+The server starts at `http://localhost:5123` and serves both the web application and WebSocket API.
 
 ### Run Tests
 
@@ -75,6 +75,18 @@ npm install
 npm test
 ```
 
+### Run with Docker
+
+```bash
+# Build the image
+docker build -t delta-board .
+
+# Run it
+docker run -p 8080:8080 delta-board
+```
+
+The server starts at `http://localhost:8080`. The container listens on port 8080 by default (configurable via `ASPNETCORE_HTTP_PORTS`).
+
 ## CI
 
 GitHub Actions runs on every push to `main` and on pull requests:
@@ -82,6 +94,20 @@ GitHub Actions runs on every push to `main` and on pull requests:
 - Build the .NET server
 - Run .NET server tests (xUnit)
 - Run JavaScript client tests (Vitest)
+
+## Releases
+
+When a [GitHub release](https://docs.github.com/en/repositories/releasing-projects-on-github) is published, a workflow builds a multi-platform Docker image (`linux/amd64`, `linux/arm64`) and pushes it to GHCR.
+
+| Release type | Example tag        | Container tags    |
+| ------------ | ------------------ | ----------------- |
+| Pre-release  | `v0.1.0-preview.1` | `0.1.0-preview.1` |
+| Stable       | `v1.0.0`           | `1.0.0`, `latest` |
+
+```bash
+# Pull and run a specific version
+docker run -p 8080:8080 ghcr.io/yoannchaudet/delta-board:1.0.0
+```
 
 ## Documentation
 
