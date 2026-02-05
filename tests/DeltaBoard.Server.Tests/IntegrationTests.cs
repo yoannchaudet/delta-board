@@ -160,12 +160,20 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         }
         finally
         {
-            // Cleanup
+            // Cleanup - connections may already be closed by the server due to
+            // participantsUpdate broadcasts racing with our cleanup
             foreach (var ws in connections)
             {
-                if (ws.State == WebSocketState.Open)
+                try
                 {
-                    await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+                    if (ws.State == WebSocketState.Open)
+                    {
+                        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Test complete", CancellationToken.None);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Connection already closed/disposed by server
                 }
             }
         }
