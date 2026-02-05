@@ -64,6 +64,15 @@ The server is packaged as a multi-stage Docker image (Alpine-based, self-contain
 - **Container**: No Kestrel override in `appsettings.json`, so .NET defaults to port 8080 on all interfaces
 - **Port override**: Set `ASPNETCORE_HTTP_PORTS` environment variable to change the listening port
 
+### Release Pipeline
+
+A GitHub Actions workflow (`.github/workflows/release.yml`) publishes container images to GHCR on every GitHub release:
+
+- **Trigger**: `release` → `published` event
+- **Auth**: Built-in `GITHUB_TOKEN` (no additional secrets required)
+- **Platforms**: `linux/amd64` and `linux/arm64` via QEMU + buildx
+- **Tagging**: `docker/metadata-action` strips the `v` prefix from the git tag (e.g. `v1.0.0` → `1.0.0`). The `latest` tag is only applied to non-pre-release versions.
+
 ### Azure Container Apps
 
 When deploying to Azure Container Apps:
