@@ -129,6 +129,7 @@ function initBoard(boardId) {
         onParticipantsUpdate: (participantCount, readyCount, syncForClientId) => {
             console.log(`Participants: ${participantCount}, Ready: ${readyCount}`);
             updatePresence(participantCount, readyCount);
+            updateQuorumBanner(participantCount, readyCount);
 
             // If a new client joined, send them our state
             if (syncForClientId) {
@@ -212,6 +213,22 @@ function initBoard(boardId) {
         readyBtn.classList.toggle('active', isReady);
         connection.send({ type: 'setReady', ready: isReady });
     });
+
+    // Quorum banner
+    const quorumWrapper = document.getElementById('quorum-banner-wrapper');
+    document.getElementById('start-review-btn').addEventListener('click', () => {
+        if (!confirm('Start the review phase?\n\nThis cannot be undone. Columns and votes will be frozen for all participants.')) {
+            return;
+        }
+        // TODO: broadcast phase change
+        console.log('Review phase started');
+    });
+
+    function updateQuorumBanner(participantCount, readyCount) {
+        const needed = quorumNeeded(participantCount);
+        const reached = participantCount > 0 && readyCount >= needed;
+        quorumWrapper.classList.toggle('visible', reached);
+    }
 
     // Store for debugging
     window._connection = connection;
@@ -490,6 +507,16 @@ function initBoard(boardId) {
 }
 
 /**
+ * Calculate the readiness quorum needed for a given participant count
+ * @param {number} participantCount
+ * @returns {number}
+ */
+function quorumNeeded(participantCount) {
+    if (participantCount <= 2) return participantCount;
+    return Math.ceil(0.6 * participantCount);
+}
+
+/**
  * Animate a number element with a tick effect when the value changes
  * @param {HTMLElement} numEl
  * @param {number} value
@@ -564,10 +591,11 @@ function updateConnectionStatus(el, state) {
     const reconnectBtn = document.getElementById('reconnect-btn');
     reconnectBtn.style.display = state === 'closed' ? '' : 'none';
 
-    // Hide presence and ready button when disconnected
+    // Hide presence, ready button, and quorum banner when disconnected
     if (state === 'closed') {
         updatePresence(0, 0);
         document.getElementById('ready-btn').style.display = 'none';
+        document.getElementById('quorum-banner-wrapper').classList.remove('visible');
     } else if (state === 'ready') {
         document.getElementById('ready-btn').style.display = '';
     }
