@@ -243,6 +243,10 @@ function initBoard(boardId) {
     });
 
     function updateQuorumBanner(participantCount, readyCount) {
+        if (currentPhase === 'reviewing') {
+            quorumWrapper.classList.remove('visible');
+            return;
+        }
         const needed = quorumNeeded(participantCount);
         const reached = participantCount > 0 && readyCount >= needed;
         quorumWrapper.classList.toggle('visible', reached);
