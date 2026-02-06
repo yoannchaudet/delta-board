@@ -139,8 +139,7 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
                     new Uri(TestBaseAddress, $"/board/{boardId}/ws"),
                     CancellationToken.None);
                 await SendJson(ws, new { type = "hello", clientId = $"client-{i}" });
-                var welcome = await ReceiveJson(ws);
-                Assert.Equal("welcome", welcome.GetProperty("type").GetString());
+                var welcome = await ReceiveMessageOfType(ws, "welcome");
                 connections.Add(ws);
             }
 
@@ -544,8 +543,7 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
             CancellationToken.None);
 
         await SendJson(ws, new { type = "hello", clientId });
-        var welcome = await ReceiveJson(ws);
-        Assert.Equal("welcome", welcome.GetProperty("type").GetString());
+        var welcome = await ReceiveMessageOfType(ws, "welcome");
 
         return ws;
     }
