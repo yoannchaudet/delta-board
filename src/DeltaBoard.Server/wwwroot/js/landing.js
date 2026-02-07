@@ -1,6 +1,6 @@
 // Landing Page Module
 
-import { getAllBoards, deleteBoard, hasBoards } from './storage.js';
+import { getAllBoards, deleteBoard, hasBoards, loadBoard, saveBoard } from './storage.js';
 import { generateBoardId } from './board.js';
 
 /**
@@ -61,8 +61,12 @@ function createBoardCard(board) {
 
     const cardCountText = board.cardCount === 1 ? '1 card' : `${board.cardCount} cards`;
     const voteCountText = board.voteCount === 1 ? '1 vote' : `${board.voteCount} votes`;
-    const reviewingChip = board.phase === 'reviewing'
+    const isReviewing = board.phase === 'reviewing';
+    const reviewingChip = isReviewing
         ? '<span class="phase-chip">Reviewing</span>'
+        : '';
+    const cloneButton = isReviewing
+        ? '<button class="btn-card-action board-card-clone" title="Clone board">Clone</button>'
         : '';
 
     card.innerHTML = `
@@ -74,8 +78,36 @@ function createBoardCard(board) {
                 <span>${voteCountText}</span>
             </div>
         </div>
-        <button class="btn-card-action btn-delete board-card-delete" title="Delete board">Delete</button>
+        <div class="board-card-actions">
+            ${cloneButton}
+            <button class="btn-card-action btn-delete board-card-delete" title="Delete board">Delete</button>
+        </div>
     `;
+
+    const cloneBtn = card.querySelector('.board-card-clone');
+    if (cloneBtn) {
+        cloneBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const state = loadBoard(board.id);
+            if (!state) {
+                return;
+            }
+
+            const keepVotes = confirm('Keep votes in the cloned board?\n\nOK = Keep votes\nCancel = Clear votes');
+            const newBoardId = generateBoardId();
+            const clonedState = {
+                version: state.version || 1,
+                phase: 'forming',
+                cards: state.cards || [],
+                votes: keepVotes ? (state.votes || []) : []
+            };
+
+            saveBoard(newBoardId, clonedState);
+            window.location.href = `/board/${newBoardId}`;
+        });
+    }
 
     // Prevent navigation when clicking delete button
     const deleteBtn = card.querySelector('.board-card-delete');

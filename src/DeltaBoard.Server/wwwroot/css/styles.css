@@ -796,12 +796,14 @@ button.card-votes:active {
     gap: 0.5rem;
 }
 
-.board-card-delete {
+.board-card-actions {
+    display: flex;
+    gap: 0.5rem;
     opacity: 0;
     transition: opacity 0.2s;
 }
 
-.board-card:hover .board-card-delete {
+.board-card:hover .board-card-actions {
     opacity: 1;
 }
 
