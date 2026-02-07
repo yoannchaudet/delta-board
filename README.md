@@ -47,7 +47,9 @@ delta-board/
 │   └── client/                  # JavaScript Vitest tests
 ├── docs/
 │   ├── DESIGN.md               # Technical design documentation
-│   └── PROTOCOL.md             # WebSocket protocol specification
+│   ├── LIFE_CYCLE.md           # Board phases and transitions
+│   ├── PROTOCOL.md             # WebSocket protocol specification
+│   └── STYLE.md                # Visual identity and brand guidelines
 ├── package.json                # JS test tooling
 ├── vitest.config.js
 └── delta-board.sln
@@ -109,13 +111,12 @@ When a [GitHub release](https://docs.github.com/en/repositories/releasing-projec
 docker run -p 8080:8080 ghcr.io/yoannchaudet/delta-board:1.0.0
 ```
 
-## Version Display
-
-Container images built from releases embed the Git tag as the app version, shown in the footer. Local dev builds (`dotnet run`) show no version.
-
 ## Documentation
 
-See [docs/DESIGN.md](docs/DESIGN.md) for detailed technical design and architecture.
+- [docs/DESIGN.md](docs/DESIGN.md) - Architecture, tech stack, and deployment
+- [docs/LIFE_CYCLE.md](docs/LIFE_CYCLE.md) - Board phases (forming/reviewing) and transitions
+- [docs/PROTOCOL.md](docs/PROTOCOL.md) - WebSocket protocol and message schemas
+- [docs/STYLE.md](docs/STYLE.md) - Visual identity, colors, and brand guidelines
 
 ## License
 
