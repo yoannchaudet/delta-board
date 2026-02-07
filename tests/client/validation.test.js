@@ -26,6 +26,7 @@ describe('validation', () => {
         const op = {
             type: 'cardOp',
             opId: 'op-1',
+            senderId: 'client-1',
             action: 'edit',
             phase: 'forming',
             cardId: 'card-1',
@@ -42,6 +43,7 @@ describe('validation', () => {
         const op = {
             type: 'vote',
             opId: 'op-2',
+            senderId: 'client-2',
             action: 'add',
             phase: 'forming',
             cardId: 'card-1',
@@ -56,6 +58,7 @@ describe('validation', () => {
         const op = {
             type: 'cardOp',
             opId: 'op-3',
+            senderId: 'client-1',
             action: 'edit',
             phase: 'forming',
             cardId: 'card-1',
@@ -67,8 +70,40 @@ describe('validation', () => {
         expect(validateIncomingCardOp(op, state, 'reviewing')).toBe(false);
     });
 
+    it('rejects incoming card ops when senderId does not match authorId', () => {
+        const state = baseState();
+        const op = {
+            type: 'cardOp',
+            opId: 'op-3b',
+            senderId: 'client-2',
+            action: 'edit',
+            phase: 'forming',
+            cardId: 'card-1',
+            column: 'well',
+            text: 'Updated',
+            authorId: 'client-1',
+            rev: 3
+        };
+        expect(validateIncomingCardOp(op, state, 'forming')).toBe(false);
+    });
+
+    it('rejects incoming vote ops when senderId does not match voterId', () => {
+        const state = baseState();
+        const op = {
+            type: 'vote',
+            opId: 'op-3c',
+            senderId: 'client-1',
+            action: 'add',
+            phase: 'forming',
+            cardId: 'card-1',
+            voterId: 'client-2',
+            rev: 4
+        };
+        expect(validateIncomingVoteOp(op, state, 'forming')).toBe(false);
+    });
+
     it('accepts incoming phaseChanged to reviewing', () => {
-        const op = { type: 'phaseChanged', opId: 'op-4', phase: 'reviewing' };
+        const op = { type: 'phaseChanged', opId: 'op-4', senderId: 'client-1', phase: 'reviewing' };
         expect(validateIncomingPhaseChange(op, 'forming')).toBe(true);
     });
 

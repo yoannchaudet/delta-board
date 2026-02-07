@@ -32,6 +32,7 @@ All messages are JSON objects sent over the WebSocket connection.
 
 - `opId`: string (UUID or collision-resistant unique id)
 - `clientId`: string (stable per browser profile)
+- `senderId`: string (clientId of the sender, added by the server)
 - `phase`: `"forming" | "reviewing"`
 - `column`: `"well" | "delta"`
 - `rev`: number (monotonic per entity, including votes)
@@ -107,11 +108,12 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `phaseChanged` (Client → Clients via Server)
 
 ```json
-{ "type": "phaseChanged", "opId": "uuid", "phase": "reviewing" }
+{ "type": "phaseChanged", "opId": "uuid", "senderId": "client-1", "phase": "reviewing" }
 ```
 
 - `type` (string, required)
 - `opId` (string, required)
+- `senderId` (string, required; added by the server)
 - `phase` (string, required; target phase)
 
 <a id="schema-syncstate"></a>
@@ -168,6 +170,7 @@ Create:
 {
   "type": "cardOp",
   "opId": "uuid",
+  "senderId": "client-1",
   "phase": "forming",
   "action": "create",
   "cardId": "...",
@@ -184,6 +187,7 @@ Edit:
 {
   "type": "cardOp",
   "opId": "uuid",
+  "senderId": "client-1",
   "phase": "forming",
   "action": "edit",
   "cardId": "...",
@@ -200,6 +204,7 @@ Delete:
 {
   "type": "cardOp",
   "opId": "uuid",
+  "senderId": "client-1",
   "phase": "forming",
   "action": "delete",
   "cardId": "...",
@@ -210,6 +215,7 @@ Delete:
 
 - `type` (string, required)
 - `opId` (string, required)
+- `senderId` (string, required; added by the server)
 - `phase` (string, required)
 - `action` (string, required: `create | edit | delete`)
 - `cardId` (string, required)
@@ -226,6 +232,7 @@ Delete:
 {
   "type": "vote",
   "opId": "uuid",
+  "senderId": "client-1",
   "phase": "forming",
   "action": "add",
   "cardId": "...",
@@ -238,6 +245,7 @@ Delete:
 {
   "type": "vote",
   "opId": "uuid",
+  "senderId": "client-1",
   "phase": "forming",
   "action": "remove",
   "cardId": "...",
@@ -248,6 +256,7 @@ Delete:
 
 - `type` (string, required)
 - `opId` (string, required)
+- `senderId` (string, required; added by the server)
 - `phase` (string, required)
 - `action` (string, required: `add | remove`)
 - `cardId` (string, required)
@@ -461,7 +470,7 @@ Clients must validate outgoing and incoming operations:
 
 ## Implementation Rules
 
-- `authorId` and `voterId` MUST equal the sender's `clientId` (v1 has no separate user identity).
+- `authorId` and `voterId` MUST equal the sender's `clientId` (v1 has no separate user identity). The server adds `senderId` so receivers can enforce this.
 - For cards: clients set `rev = (max rev seen for that card) + 1` when editing or deleting.
 - For votes: clients set `rev = (max rev seen for that (cardId, voterId)) + 1` when adding or removing.
 - Clients SHOULD persist current card/vote `rev` values as part of local state so reloads do not reset counters.

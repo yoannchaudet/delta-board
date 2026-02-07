@@ -249,6 +249,7 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
             // ws2 should receive the cardOp
             var received = await ReceiveMessageOfType(ws2, "cardOp");
             Assert.Equal("card-1", received.GetProperty("cardId").GetString());
+            Assert.Equal("client-1", received.GetProperty("senderId").GetString());
         }
         finally
         {
@@ -286,6 +287,7 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
             // ws2 should receive the vote
             var received = await ReceiveMessageOfType(ws2, "vote");
             Assert.Equal("card-1", received.GetProperty("cardId").GetString());
+            Assert.Equal("client-1", received.GetProperty("senderId").GetString());
         }
         finally
         {
@@ -310,7 +312,7 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         try
         {
             // Act - ws1 sets ready
-            await SendJson(ws1, new { type = "setReady", opId = "ready-op-1", ready = true });
+            await SendJson(ws1, new { type = "setReady", isReady = true });
 
             // ws2 should receive participantsUpdate with readyCount = 1
             var update = await ReceiveParticipantsUpdate(ws2, expectedReadyCount: 1);

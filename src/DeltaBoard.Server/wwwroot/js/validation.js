@@ -37,10 +37,12 @@ function validateCommonOp(op, localPhase) {
 export function validateIncomingCardOp(op, state, localPhase) {
     if (!op || op.type !== 'cardOp' || !op.opId) return false;
     if (!validateCommonOp(op, localPhase)) return false;
+    if (!op.senderId) return false;
     if (!op.cardId || !op.authorId) return false;
     if (!isFiniteNumber(op.rev) || op.rev < 1) return false;
     if (op.action !== 'create' && op.action !== 'edit' && op.action !== 'delete') return false;
     if (op.action === 'create' && (!op.column || !op.text)) return false;
+    if (op.authorId !== op.senderId) return false;
 
     const existingRev = getCardRev(state, op.cardId);
     if (existingRev !== null && op.rev < existingRev) return false;
@@ -51,9 +53,11 @@ export function validateIncomingCardOp(op, state, localPhase) {
 export function validateIncomingVoteOp(op, state, localPhase) {
     if (!op || op.type !== 'vote' || !op.opId) return false;
     if (!validateCommonOp(op, localPhase)) return false;
+    if (!op.senderId) return false;
     if (!op.cardId || !op.voterId) return false;
     if (!isFiniteNumber(op.rev) || op.rev < 1) return false;
     if (op.action !== 'add' && op.action !== 'remove') return false;
+    if (op.voterId !== op.senderId) return false;
 
     const existingRev = getVoteRev(state, op.cardId, op.voterId);
     if (existingRev !== null && op.rev < existingRev) return false;
@@ -64,6 +68,7 @@ export function validateIncomingVoteOp(op, state, localPhase) {
 export function validateIncomingPhaseChange(op, localPhase) {
     if (!op || op.type !== 'phaseChanged' || !op.opId) return false;
     if (!validateCommonOp(op, localPhase)) return false;
+    if (!op.senderId) return false;
     return true;
 }
 
@@ -97,4 +102,3 @@ export function validateLocalVoteOp(op, state, localPhase, localClientId) {
 
     return true;
 }
-
