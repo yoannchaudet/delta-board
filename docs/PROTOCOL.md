@@ -7,8 +7,8 @@ Delta Board uses WebSockets for real-time collaboration between clients. The ser
 | Type                                             | Direction                     | Description                                     |
 | ------------------------------------------------ | ----------------------------- | ----------------------------------------------- |
 | [hello](#schema-hello)                           | Client → Server               | Initial handshake, includes clientId            |
-| [welcome](#schema-welcome)                       | Server → Client               | Returns participant counts, then initiates sync |
-| [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes    |
+| [welcome](#schema-welcome)                       | Server → Client               | Returns participant count, then initiates sync |
+| [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes   |
 | [setReady](#schema-setready)                     | Client → Server               | Participant updates readiness state             |
 | [phaseChanged](#schema-phasechanged)             | Client → Clients (via Server) | Broadcast phase transition to reviewing         |
 | [syncState](#schema-syncstate)                   | Client → Client (via Server)  | Send full board state to a new client           |
@@ -60,11 +60,11 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `welcome` (Server → Client)
 
 ```json
-{ "type": "welcome", "participantsCount": 4, "readyCount": 2 }
+{ "type": "welcome", "participantCount": 4, "readyCount": 2 }
 ```
 
 - `type` (string, required)
-- `participantsCount` (number, required)
+- `participantCount` (number, required)
 - `readyCount` (number, required)
 - `welcome` provides the new client with the current counts; the server does **not** send a `participantsUpdate` back to the joining client.
 
@@ -73,20 +73,20 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `participantsUpdate` (Server → Clients)
 
 ```json
-{ "type": "participantsUpdate", "participantsCount": 5, "readyCount": 3 }
+{ "type": "participantsUpdate", "participantCount": 5, "readyCount": 3 }
 ```
 
 ```json
 {
   "type": "participantsUpdate",
-  "participantsCount": 5,
+    "participantCount": 5,
   "readyCount": 3,
   "syncForClientId": "..."
 }
 ```
 
 - `type` (string, required)
-- `participantsCount` (number, required)
+- `participantCount` (number, required)
 - `readyCount` (number, required)
 - `syncForClientId` (string, optional; when present, indicates who needs a [syncState](#schema-syncstate))
 - On join/leave, the server broadcasts `participantsUpdate` to **all other** connected clients (not the initiator).
@@ -123,38 +123,41 @@ All messages are JSON objects sent over the WebSocket connection.
 {
   "type": "syncState",
   "targetClientId": "...",
-  "version": 1,
-  "phase": "forming",
-  "cards": [
-    {
-      "id": "...",
-      "rev": 2,
-      "column": "well",
-      "text": "...",
-      "authorId": "...",
-      "isDeleted": false
-    }
-  ],
-  "votes": [{ "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }]
+  "state": {
+    "version": 1,
+    "phase": "forming",
+    "cards": [
+      {
+        "id": "...",
+        "rev": 2,
+        "column": "well",
+        "text": "...",
+        "authorId": "...",
+        "isDeleted": false
+      }
+    ],
+    "votes": [{ "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }]
+  }
 }
 ```
 
 - `type` (string, required)
 - `targetClientId` (string, optional; when omitted, server broadcasts to all clients except the sender)
-- `version` (number, required; board schema version, currently `1`)
-- `phase` (string, required)
-- `cards` (array, required)
-  - `id` (string, required)
-  - `rev` (number, required)
-  - `column` (string, required)
-  - `text` (string, required)
-  - `authorId` (string, required)
-  - `isDeleted` (boolean, required)
-- `votes` (array, required)
-  - `cardId` (string, required)
-  - `voterId` (string, required)
-  - `rev` (number, required)
-  - `isDeleted` (boolean, required)
+- `state` (object, required)
+  - `version` (number, required; board schema version, currently `1`)
+  - `phase` (string, required)
+  - `cards` (array, required)
+    - `id` (string, required)
+    - `rev` (number, required)
+    - `column` (string, required)
+    - `text` (string, required)
+    - `authorId` (string, required)
+    - `isDeleted` (boolean, required)
+  - `votes` (array, required)
+    - `cardId` (string, required)
+    - `voterId` (string, required)
+    - `rev` (number, required)
+    - `isDeleted` (boolean, required)
 
 <a id="schema-cardop"></a>
 
@@ -257,12 +260,11 @@ Delete:
 ### `error` (Server → Client)
 
 ```json
-{ "type": "error", "opId": "uuid", "reason": "Invalid message" }
+{ "type": "error", "message": "Invalid message" }
 ```
 
 - `type` (string, required)
-- `opId` (string, required)
-- `reason` (string, required)
+- `message` (string, required)
 
 <a id="schema-ping"></a>
 <a id="schema-pong"></a>
@@ -422,7 +424,7 @@ In `syncState`, `isDeleted: true` represents a removed vote tombstone.
 
 ## State Sync
 
-`syncState` provides a snapshot with revisions. See the `syncState` schema in the Message Schemas section: [syncState](#schema-syncstate).
+`syncState` provides a snapshot with revisions in the `state` payload. See the `syncState` schema in the Message Schemas section: [syncState](#schema-syncstate).
 
 ### Merge Rules
 
