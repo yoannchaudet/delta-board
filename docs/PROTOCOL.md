@@ -7,8 +7,8 @@ Delta Board uses WebSockets for real-time collaboration between clients. The ser
 | Type                                             | Direction                     | Description                                     |
 | ------------------------------------------------ | ----------------------------- | ----------------------------------------------- |
 | [hello](#schema-hello)                           | Client → Server               | Initial handshake, includes clientId            |
-| [welcome](#schema-welcome)                       | Server → Client               | Returns participant counts, then initiates sync |
-| [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes    |
+| [welcome](#schema-welcome)                       | Server → Client               | Returns participant count, then initiates sync |
+| [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes   |
 | [setReady](#schema-setready)                     | Client → Server               | Participant updates readiness state             |
 | [phaseChanged](#schema-phasechanged)             | Client → Clients (via Server) | Broadcast phase transition to reviewing         |
 | [syncState](#schema-syncstate)                   | Client → Client (via Server)  | Send full board state to a new client           |
@@ -60,11 +60,11 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `welcome` (Server → Client)
 
 ```json
-{ "type": "welcome", "participantsCount": 4, "readyCount": 2 }
+{ "type": "welcome", "participantCount": 4, "readyCount": 2 }
 ```
 
 - `type` (string, required)
-- `participantsCount` (number, required)
+- `participantCount` (number, required)
 - `readyCount` (number, required)
 - `welcome` provides the new client with the current counts; the server does **not** send a `participantsUpdate` back to the joining client.
 
@@ -73,20 +73,20 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `participantsUpdate` (Server → Clients)
 
 ```json
-{ "type": "participantsUpdate", "participantsCount": 5, "readyCount": 3 }
+{ "type": "participantsUpdate", "participantCount": 5, "readyCount": 3 }
 ```
 
 ```json
 {
   "type": "participantsUpdate",
-  "participantsCount": 5,
+    "participantCount": 5,
   "readyCount": 3,
   "syncForClientId": "..."
 }
 ```
 
 - `type` (string, required)
-- `participantsCount` (number, required)
+- `participantCount` (number, required)
 - `readyCount` (number, required)
 - `syncForClientId` (string, optional; when present, indicates who needs a [syncState](#schema-syncstate))
 - On join/leave, the server broadcasts `participantsUpdate` to **all other** connected clients (not the initiator).
