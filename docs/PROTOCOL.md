@@ -123,38 +123,41 @@ All messages are JSON objects sent over the WebSocket connection.
 {
   "type": "syncState",
   "targetClientId": "...",
-  "version": 1,
-  "phase": "forming",
-  "cards": [
-    {
-      "id": "...",
-      "rev": 2,
-      "column": "well",
-      "text": "...",
-      "authorId": "...",
-      "isDeleted": false
-    }
-  ],
-  "votes": [{ "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }]
+  "state": {
+    "version": 1,
+    "phase": "forming",
+    "cards": [
+      {
+        "id": "...",
+        "rev": 2,
+        "column": "well",
+        "text": "...",
+        "authorId": "...",
+        "isDeleted": false
+      }
+    ],
+    "votes": [{ "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }]
+  }
 }
 ```
 
 - `type` (string, required)
 - `targetClientId` (string, optional; when omitted, server broadcasts to all clients except the sender)
-- `version` (number, required; board schema version, currently `1`)
-- `phase` (string, required)
-- `cards` (array, required)
-  - `id` (string, required)
-  - `rev` (number, required)
-  - `column` (string, required)
-  - `text` (string, required)
-  - `authorId` (string, required)
-  - `isDeleted` (boolean, required)
-- `votes` (array, required)
-  - `cardId` (string, required)
-  - `voterId` (string, required)
-  - `rev` (number, required)
-  - `isDeleted` (boolean, required)
+- `state` (object, required)
+  - `version` (number, required; board schema version, currently `1`)
+  - `phase` (string, required)
+  - `cards` (array, required)
+    - `id` (string, required)
+    - `rev` (number, required)
+    - `column` (string, required)
+    - `text` (string, required)
+    - `authorId` (string, required)
+    - `isDeleted` (boolean, required)
+  - `votes` (array, required)
+    - `cardId` (string, required)
+    - `voterId` (string, required)
+    - `rev` (number, required)
+    - `isDeleted` (boolean, required)
 
 <a id="schema-cardop"></a>
 
@@ -422,7 +425,7 @@ In `syncState`, `isDeleted: true` represents a removed vote tombstone.
 
 ## State Sync
 
-`syncState` provides a snapshot with revisions. See the `syncState` schema in the Message Schemas section: [syncState](#schema-syncstate).
+`syncState` provides a snapshot with revisions in the `state` payload. See the `syncState` schema in the Message Schemas section: [syncState](#schema-syncstate).
 
 ### Merge Rules
 
