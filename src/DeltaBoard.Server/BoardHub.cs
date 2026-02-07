@@ -33,7 +33,7 @@ public sealed class BoardHub
         // Check capacity before handshake
         if (board.Participants.Count >= MaxParticipantsPerBoard)
         {
-            await SendError(webSocket, "Board is full (max 20 participants)", "unknown", cancellationToken);
+            await SendError(webSocket, "BOARD_FULL", "Board is full (max 20 participants)", "unknown", cancellationToken);
             await webSocket.CloseAsync(
                 WebSocketCloseStatus.PolicyViolation,
                 "Board is full",
@@ -53,7 +53,7 @@ public sealed class BoardHub
         if (!board.Participants.TryAdd(clientId, new ParticipantState(webSocket)))
         {
             _logger.LogWarning("ws-duplicate-client {ConnectionId} {BoardId} {ClientId}", connectionId, boardId, clientId);
-            await SendError(webSocket, "Client ID already connected to this board", clientId, cancellationToken);
+            await SendError(webSocket, "DUPLICATE_CLIENT", "Client ID already connected to this board", clientId, cancellationToken);
             await webSocket.CloseAsync(
                 WebSocketCloseStatus.PolicyViolation,
                 "Duplicate client ID",
@@ -160,9 +160,9 @@ public sealed class BoardHub
         await SendJson(webSocket, welcome, clientId, cancellationToken);
     }
 
-    private async Task SendError(WebSocket webSocket, string message, string clientId, CancellationToken cancellationToken)
+    private async Task SendError(WebSocket webSocket, string code, string message, string clientId, CancellationToken cancellationToken)
     {
-        var error = new { type = "error", message };
+        var error = new { type = "error", code, message };
         await SendJson(webSocket, error, clientId, cancellationToken);
     }
 

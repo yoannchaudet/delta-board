@@ -288,6 +288,50 @@ header {
     background-color: #43a047;
 }
 
+/* Error overlay */
+.error-overlay {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.error-overlay .error-container {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    max-width: 500px;
+}
+
+.error-overlay .error-image {
+    width: 100px;
+    height: auto;
+    flex-shrink: 0;
+}
+
+.error-overlay .error-text h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-brown);
+    margin-bottom: 0.5rem;
+}
+
+.error-overlay .error-text p {
+    color: var(--color-text-light);
+    margin-bottom: 1rem;
+}
+
+.error-overlay .error-text a {
+    color: var(--color-brown);
+    font-weight: 500;
+    text-decoration: underline;
+}
+
+.error-overlay .error-text a:hover {
+    color: var(--color-text);
+}
+
 /* Edit overlay */
 .edit-overlay {
     display: none;
@@ -843,5 +887,14 @@ button.card-votes:active {
 
     .board-card-delete {
         opacity: 1;
+    }
+
+    .error-overlay .error-container {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .error-overlay .error-image {
+        width: 80px;
     }
 }
