@@ -84,7 +84,7 @@ When deploying to Azure Container Apps:
 
 ## Version Display
 
-The release Git tag (e.g. `v1.0.0`) is passed as a Docker build arg (`VERSION`) and baked into the assembly's `InformationalVersion`. At startup, `Program.cs` reads this version and replaces a `{{VERSION}}` placeholder in `index.html` before serving it. The version is displayed in the footer with low-contrast styling. Local dev builds show no version string.
+The release Git tag (e.g. `v1.0.0`) is passed as a Docker build arg (`VERSION`) and baked into the assembly's `InformationalVersion`. At startup, `Program.cs` reads this version and replaces a `{{VERSION}}` placeholder in `index.html` before serving it. The version is displayed in the footer with low-contrast styling. Local dev builds show `0.0.0-dev`.
 
 ## Limitations by Design
 
