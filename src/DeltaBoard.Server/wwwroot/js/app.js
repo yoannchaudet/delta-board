@@ -159,15 +159,6 @@ function initBoard(boardId) {
                 return;
             }
 
-            if (message.type === 'requestSync') {
-                // Another client wants our state
-                connection.send({
-                    type: 'syncState',
-                    state: state
-                });
-                return;
-            }
-
             // For operations, check dedup and sync buffering
             if (message.type === 'cardOp') {
                 if (!isValidCardOp(message, state.phase)) {
