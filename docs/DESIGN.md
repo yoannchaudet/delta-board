@@ -82,6 +82,79 @@ When deploying to Azure Container Apps:
 - The app implements ping/pong keepalives (30s interval) which prevents Azure's 240s idle timeout from disconnecting WebSocket clients
 - Enable sticky sessions if scaling to multiple replicas
 
+## Scaling to Multiple Instances
+
+The server is a stateless message relay — it holds no board data, only WebSocket
+references and participant presence. All board content (cards, votes, phase) is
+owned by clients in browser localStorage. This means scaling does **not** require
+a distributed cache like Redis.
+
+### Strategy: Board-level sticky sessions
+
+The URL structure already encodes the board identity: `/board/{boardId}/ws`. A
+load balancer can consistently hash on the `boardId` path segment so every
+WebSocket connection for a given board always lands on the same server instance.
+
+```
+                       ┌──────────────┐
+                       │ Load Balancer │
+                       │ hash(boardId) │
+                       └──┬─────┬─────┘
+                          │     │
+               board-abc ─┘     └─ board-xyz
+                          │           │
+                    ┌─────▼──┐  ┌─────▼──┐
+                    │ Inst 1 │  │ Inst 2 │
+                    │ abc    │  │ xyz    │
+                    └────────┘  └────────┘
+```
+
+Each instance manages boards independently using its in-memory
+`ConcurrentDictionary<string, BoardState>`. No cross-instance communication is
+needed.
+
+### Load balancer configuration
+
+| Platform             | Mechanism                                                   |
+| -------------------- | ----------------------------------------------------------- |
+| Azure Container Apps | Built-in sticky sessions (affinity cookie on `/board/{id}`) |
+| Nginx                | `hash $uri consistent` on the upstream block                |
+| Envoy / Istio        | Consistent hash ring on the request path                    |
+| AWS ALB              | Application cookie-based stickiness                         |
+
+### Instance failure and recovery
+
+Because clients are the source of truth, instance failure is handled entirely by
+the existing protocol:
+
+1. Instance dies → all boards on it lose WebSocket connections
+2. Load balancer rehashes → affected boards route to surviving instances
+3. Clients reconnect automatically via exponential backoff (already implemented)
+4. First client arrives with full state from localStorage
+5. Subsequent clients join → `syncState` exchange reconverges the board
+6. No data is lost; the board is fully functional within seconds
+
+### Why this is sufficient
+
+- **No server-side data to distribute**: the server relays messages, it does not
+  own state. The `BoardState` class only tracks participant sockets and readiness
+  flags — all reconstructed on reconnect.
+- **Bounded blast radius**: max 20 participants per board limits per-instance
+  load. Even with hundreds of boards, consistent hashing distributes them evenly.
+- **Ephemeral boards**: empty boards are garbage-collected when the last
+  participant disconnects, so crashed instances leave no orphaned state.
+- **Client-side conflict resolution**: the LWW merge protocol in `merge.js`
+  already handles divergent state, making reconvergence after failover automatic.
+
+### When sticky sessions are not enough
+
+If a future requirement breaks the single-instance-per-board assumption (e.g.,
+boards with thousands of participants exceeding single-instance capacity), the
+next step would be a lightweight pub/sub relay between instances (WebSocket mesh
+or a message bus) rather than shared-state caching. The operation-based design
+and idempotent `opId` deduplication make this straightforward — instances simply
+forward operations and let the existing merge rules handle convergence.
+
 ## Limitations by Design
 
 - Maximum 20 concurrent participants per board
