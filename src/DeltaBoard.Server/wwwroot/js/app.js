@@ -211,9 +211,11 @@ function initBoard(boardId) {
             console.log('Received:', message);
         },
 
-        onError: (error) => {
-            console.error('Connection error:', error);
-            // TODO: Show error to user
+        onError: ({ code, message }) => {
+            console.error('Connection error:', code, message);
+            if (code) {
+                showErrorOverlay(code, message);
+            }
         }
     });
 
@@ -770,6 +772,30 @@ function updateConnectionStatus(el, state) {
     } else if (state === 'ready' && currentPhase !== 'reviewing') {
         document.getElementById('ready-btn').style.display = '';
     }
+}
+
+/**
+ * Show full-page error overlay and hide the board
+ * @param {string} [code]
+ * @param {string} message
+ */
+function showErrorOverlay(code, message) {
+    const overlay = document.getElementById('error-overlay');
+    const boardPage = document.getElementById('board-page');
+    const messageEl = document.getElementById('error-message');
+
+    if (!overlay || overlay.style.display !== 'none') return;
+
+    const friendlyMessages = {
+        DUPLICATE_CLIENT: 'This board is already open in another tab.',
+        BOARD_FULL: 'This board is full.'
+    };
+
+    messageEl.textContent = friendlyMessages[code] || message;
+    boardPage.style.display = 'none';
+    document.getElementById('reconnect-btn').style.display = 'none';
+    document.getElementById('connection-status').style.display = 'none';
+    overlay.style.display = '';
 }
 
 // Initialize when DOM is ready

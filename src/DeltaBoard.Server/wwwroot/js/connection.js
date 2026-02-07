@@ -16,7 +16,7 @@ const RECONNECT_MAX_DELAY_MS = 10000;
  * @property {(state: ConnectionState) => void} [onStateChange]
  * @property {(participantCount: number, readyCount: number, syncForClientId?: string) => void} [onParticipantsUpdate]
  * @property {(message: Object) => void} [onMessage]
- * @property {(error: string) => void} [onError]
+ * @property {(error: {code?: string, message: string}) => void} [onError]
  */
 
 /**
@@ -100,7 +100,7 @@ export function createConnection(boardId, callbacks = {}) {
                 if (event.code === 1008 || event.code === 4000) {
                     // Policy violation (board full / duplicate clientId) - don't reconnect
                     setState('closed');
-                    callbacks.onError?.(event.reason || 'Connection rejected');
+                    callbacks.onError?.({ message: event.reason || 'Connection rejected' });
                 } else if (state !== 'closed') {
                     setState('disconnected');
                     scheduleReconnect();
@@ -143,7 +143,7 @@ export function createConnection(boardId, callbacks = {}) {
                     break;
 
                 case 'error':
-                    callbacks.onError?.(message.message);
+                    callbacks.onError?.({ code: message.code, message: message.message });
                     if (state === 'handshaking') {
                         // Error during handshake - close connection
                         console.log('[WS] Handshake error, closing connection');
@@ -208,7 +208,7 @@ export function createConnection(boardId, callbacks = {}) {
     function scheduleReconnect() {
         if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
             setState('closed');
-            callbacks.onError?.('Connection lost - max reconnect attempts reached');
+            callbacks.onError?.({ message: 'Connection lost - max reconnect attempts reached' });
             return;
         }
 

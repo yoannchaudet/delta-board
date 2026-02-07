@@ -4,19 +4,19 @@ Delta Board uses WebSockets for real-time collaboration between clients. The ser
 
 ## Message Types
 
-| Type                                             | Direction                     | Description                                     |
-| ------------------------------------------------ | ----------------------------- | ----------------------------------------------- |
-| [hello](#schema-hello)                           | Client → Server               | Initial handshake, includes clientId            |
+| Type                                             | Direction                     | Description                                    |
+| ------------------------------------------------ | ----------------------------- | ---------------------------------------------- |
+| [hello](#schema-hello)                           | Client → Server               | Initial handshake, includes clientId           |
 | [welcome](#schema-welcome)                       | Server → Client               | Returns participant count, then initiates sync |
 | [participantsUpdate](#schema-participantsupdate) | Server → Clients              | Broadcast when presence or readiness changes   |
-| [setReady](#schema-setready)                     | Client → Server               | Participant updates readiness state             |
-| [phaseChanged](#schema-phasechanged)             | Client → Clients (via Server) | Broadcast phase transition to reviewing         |
-| [syncState](#schema-syncstate)                   | Client → Client (via Server)  | Send full board state to a new client           |
-| [cardOp](#schema-cardop)                         | Client → Clients (via Server) | Card operation (create, edit, or delete)        |
-| [vote](#schema-vote)                             | Client → Clients (via Server) | Vote operation (add or remove)                  |
-| [error](#schema-error)                           | Server → Client               | Indicates an operation was rejected             |
-| [ping](#schema-ping)                             | Client → Server               | Heartbeat to indicate client is alive           |
-| [pong](#schema-pong)                             | Server → Client               | Acknowledges heartbeat                          |
+| [setReady](#schema-setready)                     | Client → Server               | Participant updates readiness state            |
+| [phaseChanged](#schema-phasechanged)             | Client → Clients (via Server) | Broadcast phase transition to reviewing        |
+| [syncState](#schema-syncstate)                   | Client → Client (via Server)  | Send full board state to a new client          |
+| [cardOp](#schema-cardop)                         | Client → Clients (via Server) | Card operation (create, edit, or delete)       |
+| [vote](#schema-vote)                             | Client → Clients (via Server) | Vote operation (add or remove)                 |
+| [error](#schema-error)                           | Server → Client               | Indicates an operation was rejected            |
+| [ping](#schema-ping)                             | Client → Server               | Heartbeat to indicate client is alive          |
+| [pong](#schema-pong)                             | Server → Client               | Acknowledges heartbeat                         |
 
 ## Schema Version
 
@@ -80,7 +80,7 @@ All messages are JSON objects sent over the WebSocket connection.
 ```json
 {
   "type": "participantsUpdate",
-    "participantCount": 5,
+  "participantCount": 5,
   "readyCount": 3,
   "syncForClientId": "..."
 }
@@ -108,7 +108,12 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `phaseChanged` (Client → Clients via Server)
 
 ```json
-{ "type": "phaseChanged", "opId": "uuid", "senderId": "client-1", "phase": "reviewing" }
+{
+  "type": "phaseChanged",
+  "opId": "uuid",
+  "senderId": "client-1",
+  "phase": "reviewing"
+}
 ```
 
 - `type` (string, required)
@@ -137,7 +142,9 @@ All messages are JSON objects sent over the WebSocket connection.
         "isDeleted": false
       }
     ],
-    "votes": [{ "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }]
+    "votes": [
+      { "cardId": "...", "voterId": "...", "rev": 3, "isDeleted": false }
+    ]
   }
 }
 ```
@@ -268,11 +275,23 @@ Delete:
 ### `error` (Server → Client)
 
 ```json
-{ "type": "error", "message": "Invalid message" }
+{
+  "type": "error",
+  "code": "DUPLICATE_CLIENT",
+  "message": "Client ID already connected to this board"
+}
 ```
 
 - `type` (string, required)
-- `message` (string, required)
+- `code` (string, required; machine-readable error identifier)
+- `message` (string, required; human-readable description)
+
+#### Error Codes
+
+| Code               | Description                                      |
+| ------------------ | ------------------------------------------------ |
+| `DUPLICATE_CLIENT` | The `clientId` is already connected to the board |
+| `BOARD_FULL`       | The board has reached its participant limit      |
 
 <a id="schema-ping"></a>
 <a id="schema-pong"></a>
