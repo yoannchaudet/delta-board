@@ -573,8 +573,19 @@ button.card-votes {
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
+button.card-votes:disabled {
+    cursor: default;
+    opacity: 0.6;
+    transform: none;
+    box-shadow: none;
+}
+
 button.card-votes:hover {
     transform: scale(1.1);
+}
+
+button.card-votes:disabled:hover {
+    transform: none;
 }
 
 button.card-votes:active {

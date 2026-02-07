@@ -21,6 +21,10 @@ import { mergeCard, mergeVote } from './merge.js';
  * @returns {BoardState}
  */
 export function applyCardOp(state, op) {
+    const isDeleted = typeof op.isDeleted === 'boolean'
+        ? op.isDeleted
+        : op.action === 'delete';
+
     const index = state.cards.findIndex(card => card.id === op.cardId);
     const nextCard = {
         id: op.cardId,
@@ -28,7 +32,7 @@ export function applyCardOp(state, op) {
         text: op.text,
         authorId: op.authorId,
         rev: op.rev,
-        isDeleted: Boolean(op.isDeleted)
+        isDeleted
     };
 
     if (index === -1) {
@@ -52,6 +56,10 @@ export function applyCardOp(state, op) {
  * @returns {BoardState}
  */
 export function applyVote(state, op) {
+    const isDeleted = typeof op.isDeleted === 'boolean'
+        ? op.isDeleted
+        : op.action === 'remove';
+
     const voteId = `${op.cardId}:${op.voterId}`;
     const index = state.votes.findIndex(vote => vote.id === voteId);
     const nextVote = {
@@ -59,7 +67,7 @@ export function applyVote(state, op) {
         cardId: op.cardId,
         voterId: op.voterId,
         rev: op.rev,
-        isDeleted: Boolean(op.isDeleted)
+        isDeleted
     };
 
     if (index === -1) {

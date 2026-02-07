@@ -7,6 +7,13 @@ import { applyCardOp, applyVote, getVisibleCards, getVoteCount, hasVoted } from 
 import { saveBoard, loadBoard } from './storage.js';
 import { createSyncManager } from './sync.js';
 import { createDedup } from './dedup.js';
+import {
+    validateIncomingCardOp,
+    validateIncomingVoteOp,
+    validateIncomingPhaseChange,
+    validateLocalCardOp,
+    validateLocalVoteOp
+} from './validation.js';
 
 // Module-level phase so status functions can check it
 let currentPhase = 'forming';
@@ -159,17 +166,11 @@ function initBoard(boardId) {
                 return;
             }
 
-            if (message.type === 'requestSync') {
-                // Another client wants our state
-                connection.send({
-                    type: 'syncState',
-                    state: state
-                });
-                return;
-            }
-
             // For operations, check dedup and sync buffering
             if (message.type === 'cardOp') {
+                if (!validateIncomingCardOp(message, state, state.phase)) {
+                    return;
+                }
                 if (message.opId && dedup.isDuplicate(message.opId)) {
                     return; // Already processed
                 }
@@ -181,6 +182,9 @@ function initBoard(boardId) {
             }
 
             if (message.type === 'vote') {
+                if (!validateIncomingVoteOp(message, state, state.phase)) {
+                    return;
+                }
                 if (message.opId && dedup.isDuplicate(message.opId)) {
                     return; // Already processed
                 }
@@ -192,6 +196,12 @@ function initBoard(boardId) {
             }
 
             if (message.type === 'phaseChanged') {
+                if (!validateIncomingPhaseChange(message, state.phase)) {
+                    return;
+                }
+                if (message.opId && dedup.isDuplicate(message.opId)) {
+                    return;
+                }
                 if (message.phase === 'reviewing') {
                     enterReviewPhase();
                 }
@@ -229,7 +239,7 @@ function initBoard(boardId) {
     readyBtn.addEventListener('click', () => {
         isReady = !isReady;
         readyBtn.classList.toggle('active', isReady);
-        connection.send({ type: 'setReady', ready: isReady });
+        connection.send({ type: 'setReady', isReady });
     });
 
     // Quorum banner
@@ -367,6 +377,8 @@ function initBoard(boardId) {
             // Editing existing card
             op = {
                 type: 'cardOp',
+                action: 'edit',
+                phase: state.phase,
                 cardId: editingCard.id,
                 column: column,
                 text: text,
@@ -379,6 +391,8 @@ function initBoard(boardId) {
             const card = createCard(column, text, connection.getClientId());
             op = {
                 type: 'cardOp',
+                action: 'create',
+                phase: state.phase,
                 cardId: card.id,
                 column: card.column,
                 text: card.text,
@@ -388,6 +402,9 @@ function initBoard(boardId) {
             };
         }
 
+        if (!validateLocalCardOp(op, state, state.phase, connection.getClientId())) {
+            return;
+        }
         applyCardOpAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
@@ -490,6 +507,7 @@ function initBoard(boardId) {
         const clientId = connection.getClientId();
         const voted = hasVoted(state, card.id, clientId);
         const voteCount = getVoteCount(state, card.id);
+        const isOwnCard = card.authorId === clientId;
 
         const isReviewing = state.phase === 'reviewing';
 
@@ -508,18 +526,23 @@ function initBoard(boardId) {
         const voteBtn = document.createElement('button');
         voteBtn.className = 'card-votes' + (voted ? ' voted' : '');
         voteBtn.textContent = String(voteCount);
-        voteBtn.title = voted ? 'Remove vote' : 'Vote';
-        voteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleVote(card, voted);
-        });
+        if (isOwnCard) {
+            voteBtn.disabled = true;
+            voteBtn.classList.add('disabled');
+            voteBtn.title = "Can't vote on your own card";
+        } else {
+            voteBtn.title = voted ? 'Remove vote' : 'Vote';
+            voteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleVote(card, voted);
+            });
+        }
 
         body.appendChild(content);
         body.appendChild(voteBtn);
         el.appendChild(body);
 
         // Card actions (edit/delete) at bottom - only for own cards
-        const isOwnCard = card.authorId === clientId;
         if (isOwnCard) {
             const actions = document.createElement('div');
             actions.className = 'card-actions';
@@ -550,6 +573,9 @@ function initBoard(boardId) {
 
     function handleVote(card, currentlyVoted) {
         const clientId = connection.getClientId();
+        if (card.authorId === clientId) {
+            return;
+        }
 
         // Find existing vote to get current rev
         const voteId = `${card.id}:${clientId}`;
@@ -558,12 +584,17 @@ function initBoard(boardId) {
 
         const op = {
             type: 'vote',
+            action: currentlyVoted ? 'remove' : 'add',
+            phase: state.phase,
             cardId: card.id,
             voterId: clientId,
             rev: currentRev + 1,
             isDeleted: currentlyVoted // Toggle: if voted, now remove; if not voted, add
         };
 
+        if (!validateLocalVoteOp(op, state, state.phase, connection.getClientId())) {
+            return;
+        }
         applyVoteAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
@@ -608,6 +639,8 @@ function initBoard(boardId) {
 
         const op = {
             type: 'cardOp',
+            action: 'delete',
+            phase: state.phase,
             cardId: card.id,
             column: card.column,
             text: card.text,
@@ -616,6 +649,9 @@ function initBoard(boardId) {
             isDeleted: true
         };
 
+        if (!validateLocalCardOp(op, state, state.phase, connection.getClientId())) {
+            return;
+        }
         applyCardOpAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
@@ -630,6 +666,9 @@ function initBoard(boardId) {
                     rev: vote.rev + 1,
                     isDeleted: true
                 };
+                if (!validateLocalVoteOp(voteOp, state, state.phase, connection.getClientId())) {
+                    continue;
+                }
                 applyVoteAndPersist(voteOp);
                 const voteOpId = connection.broadcast(voteOp);
                 dedup.markSeen(voteOpId);

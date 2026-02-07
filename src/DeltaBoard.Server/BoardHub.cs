@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace DeltaBoard.Server;
 
@@ -326,8 +327,8 @@ public sealed class BoardHub
                 case "cardOp":
                 case "vote":
                 case "phaseChanged":
-                    // Broadcast to others
-                    await BroadcastMessage(board, senderId, message);
+                    // Broadcast to others with senderId attached
+                    await BroadcastMessageWithSender(board, senderId, message);
                     break;
 
                 default:
@@ -343,7 +344,9 @@ public sealed class BoardHub
 
     private async Task HandleSetReady(BoardState board, string clientId, JsonElement root)
     {
-        if (!root.TryGetProperty("ready", out var readyEl))
+        // Spec uses isReady; accept legacy ready for backward compatibility
+        if (!root.TryGetProperty("isReady", out var readyEl) &&
+            !root.TryGetProperty("ready", out readyEl))
             return;
 
         var ready = readyEl.GetBoolean();
@@ -428,6 +431,27 @@ public sealed class BoardHub
             .Select(kvp => SendRaw(kvp.Value.Socket, message, kvp.Key, CancellationToken.None));
 
         await Task.WhenAll(tasks);
+    }
+
+    private async Task BroadcastMessageWithSender(BoardState board, string senderId, string message)
+    {
+        string payloadWithSender;
+        try
+        {
+            var node = JsonNode.Parse(message) as JsonObject;
+            if (node is null)
+                return;
+
+            node["senderId"] = senderId;
+            payloadWithSender = node.ToJsonString();
+        }
+        catch (JsonException)
+        {
+            _logger.LogWarning("ws-invalid-json {ClientId}", senderId);
+            return;
+        }
+
+        await BroadcastMessage(board, senderId, payloadWithSender);
     }
 
     private sealed class BoardState
