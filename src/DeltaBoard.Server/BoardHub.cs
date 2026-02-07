@@ -343,7 +343,9 @@ public sealed class BoardHub
 
     private async Task HandleSetReady(BoardState board, string clientId, JsonElement root)
     {
-        if (!root.TryGetProperty("ready", out var readyEl))
+        // Spec uses isReady; accept legacy ready for backward compatibility
+        if (!root.TryGetProperty("isReady", out var readyEl) &&
+            !root.TryGetProperty("ready", out readyEl))
             return;
 
         var ready = readyEl.GetBoolean();

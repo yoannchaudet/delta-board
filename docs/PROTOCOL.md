@@ -96,11 +96,10 @@ All messages are JSON objects sent over the WebSocket connection.
 ### `setReady` (Client → Server)
 
 ```json
-{ "type": "setReady", "opId": "uuid", "isReady": true }
+{ "type": "setReady", "isReady": true }
 ```
 
 - `type` (string, required)
-- `opId` (string, required)
 - `isReady` (boolean, required)
 
 <a id="schema-phasechanged"></a>
@@ -318,7 +317,6 @@ The following messages MUST include `opId`:
 
 - [cardOp](#schema-cardop)
 - [vote](#schema-vote)
-- [setReady](#schema-setready)
 - [phaseChanged](#schema-phasechanged)
 
 The following messages do NOT include `opId`:

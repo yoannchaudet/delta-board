@@ -170,6 +170,9 @@ function initBoard(boardId) {
 
             // For operations, check dedup and sync buffering
             if (message.type === 'cardOp') {
+                if (!isValidCardOp(message, state.phase)) {
+                    return;
+                }
                 if (message.opId && dedup.isDuplicate(message.opId)) {
                     return; // Already processed
                 }
@@ -181,6 +184,9 @@ function initBoard(boardId) {
             }
 
             if (message.type === 'vote') {
+                if (!isValidVoteOp(message, state.phase)) {
+                    return;
+                }
                 if (message.opId && dedup.isDuplicate(message.opId)) {
                     return; // Already processed
                 }
@@ -192,6 +198,12 @@ function initBoard(boardId) {
             }
 
             if (message.type === 'phaseChanged') {
+                if (!isValidPhaseChange(message, state.phase)) {
+                    return;
+                }
+                if (message.opId && dedup.isDuplicate(message.opId)) {
+                    return;
+                }
                 if (message.phase === 'reviewing') {
                     enterReviewPhase();
                 }
@@ -229,7 +241,7 @@ function initBoard(boardId) {
     readyBtn.addEventListener('click', () => {
         isReady = !isReady;
         readyBtn.classList.toggle('active', isReady);
-        connection.send({ type: 'setReady', ready: isReady });
+        connection.send({ type: 'setReady', isReady });
     });
 
     // Quorum banner
@@ -367,6 +379,8 @@ function initBoard(boardId) {
             // Editing existing card
             op = {
                 type: 'cardOp',
+                action: 'edit',
+                phase: state.phase,
                 cardId: editingCard.id,
                 column: column,
                 text: text,
@@ -379,6 +393,8 @@ function initBoard(boardId) {
             const card = createCard(column, text, connection.getClientId());
             op = {
                 type: 'cardOp',
+                action: 'create',
+                phase: state.phase,
                 cardId: card.id,
                 column: card.column,
                 text: card.text,
@@ -558,6 +574,8 @@ function initBoard(boardId) {
 
         const op = {
             type: 'vote',
+            action: currentlyVoted ? 'remove' : 'add',
+            phase: state.phase,
             cardId: card.id,
             voterId: clientId,
             rev: currentRev + 1,
@@ -608,6 +626,8 @@ function initBoard(boardId) {
 
         const op = {
             type: 'cardOp',
+            action: 'delete',
+            phase: state.phase,
             cardId: card.id,
             column: card.column,
             text: card.text,
@@ -636,6 +656,42 @@ function initBoard(boardId) {
             }
         }
     }
+}
+
+function isValidPhaseValue(phase) {
+    return phase === 'forming' || phase === 'reviewing';
+}
+
+function shouldRejectForPhase(messagePhase, localPhase) {
+    // Spec: if local is reviewing and incoming is forming, reject
+    return localPhase === 'reviewing' && messagePhase === 'forming';
+}
+
+function isValidCardOp(op, localPhase) {
+    if (!op || op.type !== 'cardOp' || !op.opId) return false;
+    if (!isValidPhaseValue(op.phase)) return false;
+    if (shouldRejectForPhase(op.phase, localPhase)) return false;
+    if (!op.cardId || !op.authorId) return false;
+    if (typeof op.rev !== 'number' || !Number.isFinite(op.rev)) return false;
+    if (op.action !== 'create' && op.action !== 'edit' && op.action !== 'delete') return false;
+    return true;
+}
+
+function isValidVoteOp(op, localPhase) {
+    if (!op || op.type !== 'vote' || !op.opId) return false;
+    if (!isValidPhaseValue(op.phase)) return false;
+    if (shouldRejectForPhase(op.phase, localPhase)) return false;
+    if (!op.cardId || !op.voterId) return false;
+    if (typeof op.rev !== 'number' || !Number.isFinite(op.rev)) return false;
+    if (op.action !== 'add' && op.action !== 'remove') return false;
+    return true;
+}
+
+function isValidPhaseChange(op, localPhase) {
+    if (!op || op.type !== 'phaseChanged' || !op.opId) return false;
+    if (!isValidPhaseValue(op.phase)) return false;
+    if (shouldRejectForPhase(op.phase, localPhase)) return false;
+    return true;
 }
 
 /**
