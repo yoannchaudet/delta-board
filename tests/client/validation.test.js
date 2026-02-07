@@ -135,6 +135,19 @@ describe('validation', () => {
         expect(validateLocalVoteOp(op, state, 'forming', 'client-2')).toBe(false);
     });
 
+    it('rejects local vote ops on own card', () => {
+        const state = baseState();
+        const op = {
+            type: 'vote',
+            action: 'add',
+            phase: 'forming',
+            cardId: 'card-1',
+            voterId: 'client-1',
+            rev: 4
+        };
+        expect(validateLocalVoteOp(op, state, 'forming', 'client-1')).toBe(false);
+    });
+
     it('rejects local card ops with non-monotonic rev', () => {
         const state = baseState();
         const op = {
@@ -148,5 +161,20 @@ describe('validation', () => {
             rev: 2
         };
         expect(validateLocalCardOp(op, state, 'forming', 'client-1')).toBe(false);
+    });
+
+    it('rejects incoming vote ops on own card when author is known', () => {
+        const state = baseState();
+        const op = {
+            type: 'vote',
+            opId: 'op-3d',
+            senderId: 'client-1',
+            action: 'add',
+            phase: 'forming',
+            cardId: 'card-1',
+            voterId: 'client-1',
+            rev: 4
+        };
+        expect(validateIncomingVoteOp(op, state, 'forming')).toBe(false);
     });
 });

@@ -28,6 +28,11 @@ function getVoteRev(state, cardId, voterId) {
     return vote ? vote.rev : null;
 }
 
+function getCardAuthorId(state, cardId) {
+    const card = state.cards.find(c => c.id === cardId);
+    return card ? card.authorId : null;
+}
+
 function validateCommonOp(op, localPhase) {
     if (!op || !isValidPhaseValue(op.phase)) return false;
     if (shouldRejectForPhase(op.phase, localPhase)) return false;
@@ -61,6 +66,9 @@ export function validateIncomingVoteOp(op, state, localPhase) {
 
     const existingRev = getVoteRev(state, op.cardId, op.voterId);
     if (existingRev !== null && op.rev < existingRev) return false;
+
+    const cardAuthorId = getCardAuthorId(state, op.cardId);
+    if (cardAuthorId && cardAuthorId === op.senderId) return false;
 
     return true;
 }
@@ -99,6 +107,9 @@ export function validateLocalVoteOp(op, state, localPhase, localClientId) {
     const existingRev = getVoteRev(state, op.cardId, op.voterId);
     const expectedRev = existingRev === null ? 1 : existingRev + 1;
     if (op.rev !== expectedRev) return false;
+
+    const cardAuthorId = getCardAuthorId(state, op.cardId);
+    if (cardAuthorId && cardAuthorId === localClientId) return false;
 
     return true;
 }

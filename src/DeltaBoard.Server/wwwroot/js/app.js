@@ -507,6 +507,7 @@ function initBoard(boardId) {
         const clientId = connection.getClientId();
         const voted = hasVoted(state, card.id, clientId);
         const voteCount = getVoteCount(state, card.id);
+        const isOwnCard = card.authorId === clientId;
 
         const isReviewing = state.phase === 'reviewing';
 
@@ -525,18 +526,23 @@ function initBoard(boardId) {
         const voteBtn = document.createElement('button');
         voteBtn.className = 'card-votes' + (voted ? ' voted' : '');
         voteBtn.textContent = String(voteCount);
-        voteBtn.title = voted ? 'Remove vote' : 'Vote';
-        voteBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            handleVote(card, voted);
-        });
+        if (isOwnCard) {
+            voteBtn.disabled = true;
+            voteBtn.classList.add('disabled');
+            voteBtn.title = "Can't vote on your own card";
+        } else {
+            voteBtn.title = voted ? 'Remove vote' : 'Vote';
+            voteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleVote(card, voted);
+            });
+        }
 
         body.appendChild(content);
         body.appendChild(voteBtn);
         el.appendChild(body);
 
         // Card actions (edit/delete) at bottom - only for own cards
-        const isOwnCard = card.authorId === clientId;
         if (isOwnCard) {
             const actions = document.createElement('div');
             actions.className = 'card-actions';
@@ -567,6 +573,9 @@ function initBoard(boardId) {
 
     function handleVote(card, currentlyVoted) {
         const clientId = connection.getClientId();
+        if (card.authorId === clientId) {
+            return;
+        }
 
         // Find existing vote to get current rev
         const voteId = `${card.id}:${clientId}`;
