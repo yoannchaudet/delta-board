@@ -109,6 +109,10 @@ When a [GitHub release](https://docs.github.com/en/repositories/releasing-projec
 docker run -p 8080:8080 ghcr.io/yoannchaudet/delta-board:1.0.0
 ```
 
+## Version Display
+
+Container images built from releases embed the Git tag as the app version, shown in the footer. Local dev builds (`dotnet run`) show no version.
+
 ## Documentation
 
 See [docs/DESIGN.md](docs/DESIGN.md) for detailed technical design and architecture.

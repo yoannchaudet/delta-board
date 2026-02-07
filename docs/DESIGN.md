@@ -82,6 +82,10 @@ When deploying to Azure Container Apps:
 - The app implements ping/pong keepalives (30s interval) which prevents Azure's 240s idle timeout from disconnecting WebSocket clients
 - Enable sticky sessions if scaling to multiple replicas
 
+## Version Display
+
+The release Git tag (e.g. `v1.0.0`) is passed as a Docker build arg (`VERSION`) and baked into the assembly's `InformationalVersion`. At startup, `Program.cs` reads this version and replaces a `{{VERSION}}` placeholder in `index.html` before serving it. The version is displayed in the footer with low-contrast styling. Local dev builds show no version string.
+
 ## Limitations by Design
 
 - Maximum 20 concurrent participants per board

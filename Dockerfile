@@ -1,6 +1,7 @@
 # Stage 1: Build
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS builder
 ARG TARGETARCH
+ARG VERSION=0.0.0-dev
 WORKDIR /app
 COPY . .
 RUN dotnet restore src/DeltaBoard.Server/DeltaBoard.Server.csproj -r linux-musl-$TARGETARCH
@@ -9,7 +10,8 @@ RUN dotnet publish src/DeltaBoard.Server/DeltaBoard.Server.csproj \
     -r linux-musl-$TARGETARCH \
     -o /app/publish \
     --self-contained true \
-    /p:PublishSingleFile=true
+    /p:PublishSingleFile=true \
+    /p:Version=$VERSION
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine
