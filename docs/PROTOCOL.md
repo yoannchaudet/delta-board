@@ -260,12 +260,11 @@ Delete:
 ### `error` (Server → Client)
 
 ```json
-{ "type": "error", "opId": "uuid", "reason": "Invalid message" }
+{ "type": "error", "message": "Invalid message" }
 ```
 
 - `type` (string, required)
-- `opId` (string, required)
-- `reason` (string, required)
+- `message` (string, required)
 
 <a id="schema-ping"></a>
 <a id="schema-pong"></a>
