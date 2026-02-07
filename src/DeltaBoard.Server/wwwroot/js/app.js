@@ -7,6 +7,13 @@ import { applyCardOp, applyVote, getVisibleCards, getVoteCount, hasVoted } from 
 import { saveBoard, loadBoard } from './storage.js';
 import { createSyncManager } from './sync.js';
 import { createDedup } from './dedup.js';
+import {
+    validateIncomingCardOp,
+    validateIncomingVoteOp,
+    validateIncomingPhaseChange,
+    validateLocalCardOp,
+    validateLocalVoteOp
+} from './validation.js';
 
 // Module-level phase so status functions can check it
 let currentPhase = 'forming';
@@ -161,7 +168,7 @@ function initBoard(boardId) {
 
             // For operations, check dedup and sync buffering
             if (message.type === 'cardOp') {
-                if (!isValidCardOp(message, state.phase)) {
+                if (!validateIncomingCardOp(message, state, state.phase)) {
                     return;
                 }
                 if (message.opId && dedup.isDuplicate(message.opId)) {
@@ -175,7 +182,7 @@ function initBoard(boardId) {
             }
 
             if (message.type === 'vote') {
-                if (!isValidVoteOp(message, state.phase)) {
+                if (!validateIncomingVoteOp(message, state, state.phase)) {
                     return;
                 }
                 if (message.opId && dedup.isDuplicate(message.opId)) {
@@ -189,7 +196,7 @@ function initBoard(boardId) {
             }
 
             if (message.type === 'phaseChanged') {
-                if (!isValidPhaseChange(message, state.phase)) {
+                if (!validateIncomingPhaseChange(message, state.phase)) {
                     return;
                 }
                 if (message.opId && dedup.isDuplicate(message.opId)) {
@@ -395,6 +402,9 @@ function initBoard(boardId) {
             };
         }
 
+        if (!validateLocalCardOp(op, state, state.phase, connection.getClientId())) {
+            return;
+        }
         applyCardOpAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
@@ -573,6 +583,9 @@ function initBoard(boardId) {
             isDeleted: currentlyVoted // Toggle: if voted, now remove; if not voted, add
         };
 
+        if (!validateLocalVoteOp(op, state, state.phase, connection.getClientId())) {
+            return;
+        }
         applyVoteAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
@@ -627,6 +640,9 @@ function initBoard(boardId) {
             isDeleted: true
         };
 
+        if (!validateLocalCardOp(op, state, state.phase, connection.getClientId())) {
+            return;
+        }
         applyCardOpAndPersist(op);
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
@@ -641,48 +657,15 @@ function initBoard(boardId) {
                     rev: vote.rev + 1,
                     isDeleted: true
                 };
+                if (!validateLocalVoteOp(voteOp, state, state.phase, connection.getClientId())) {
+                    continue;
+                }
                 applyVoteAndPersist(voteOp);
                 const voteOpId = connection.broadcast(voteOp);
                 dedup.markSeen(voteOpId);
             }
         }
     }
-}
-
-function isValidPhaseValue(phase) {
-    return phase === 'forming' || phase === 'reviewing';
-}
-
-function shouldRejectForPhase(messagePhase, localPhase) {
-    // Spec: if local is reviewing and incoming is forming, reject
-    return localPhase === 'reviewing' && messagePhase === 'forming';
-}
-
-function isValidCardOp(op, localPhase) {
-    if (!op || op.type !== 'cardOp' || !op.opId) return false;
-    if (!isValidPhaseValue(op.phase)) return false;
-    if (shouldRejectForPhase(op.phase, localPhase)) return false;
-    if (!op.cardId || !op.authorId) return false;
-    if (typeof op.rev !== 'number' || !Number.isFinite(op.rev)) return false;
-    if (op.action !== 'create' && op.action !== 'edit' && op.action !== 'delete') return false;
-    return true;
-}
-
-function isValidVoteOp(op, localPhase) {
-    if (!op || op.type !== 'vote' || !op.opId) return false;
-    if (!isValidPhaseValue(op.phase)) return false;
-    if (shouldRejectForPhase(op.phase, localPhase)) return false;
-    if (!op.cardId || !op.voterId) return false;
-    if (typeof op.rev !== 'number' || !Number.isFinite(op.rev)) return false;
-    if (op.action !== 'add' && op.action !== 'remove') return false;
-    return true;
-}
-
-function isValidPhaseChange(op, localPhase) {
-    if (!op || op.type !== 'phaseChanged' || !op.opId) return false;
-    if (!isValidPhaseValue(op.phase)) return false;
-    if (shouldRejectForPhase(op.phase, localPhase)) return false;
-    return true;
 }
 
 /**
