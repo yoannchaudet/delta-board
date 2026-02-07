@@ -1,3 +1,4 @@
+using System.Reflection;
 using DeltaBoard.Server;
 using Serilog;
 
@@ -35,12 +36,17 @@ static void RunApp(string[] args)
     // Serve static files from wwwroot
     app.UseStaticFiles();
 
+    // Read assembly version and prepare index.html with version stamp
+    var version = Assembly.GetExecutingAssembly()
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown version";
+    var indexHtml = File.ReadAllText(Path.Combine(app.Environment.WebRootPath, "index.html"))
+        .Replace("{{VERSION}}", version);
+
     // Landing page
-    app.MapGet("/", async context =>
+    app.MapGet("/", context =>
     {
         context.Response.ContentType = "text/html";
-        await context.Response.SendFileAsync(
-            Path.Combine(app.Environment.WebRootPath, "index.html"));
+        return context.Response.WriteAsync(indexHtml);
     });
 
     // WS endpoint
@@ -62,11 +68,10 @@ static void RunApp(string[] args)
     });
 
     // Board route (index is handled by default files)
-    app.MapGet("/board/{boardId}", async context =>
+    app.MapGet("/board/{boardId}", context =>
     {
         context.Response.ContentType = "text/html";
-        await context.Response.SendFileAsync(
-            Path.Combine(app.Environment.WebRootPath, "index.html"));
+        return context.Response.WriteAsync(indexHtml);
     });
 
     // Health check
