@@ -37,6 +37,46 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task LandingPage_ReturnsHtml()
+    {
+        // Arrange
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = TestBaseAddress
+        });
+
+        // Act
+        var response = await client.GetAsync("/");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("<!DOCTYPE html>", content);
+        Assert.Contains("Delta Board", content);
+    }
+
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/board/test-board-123")]
+    public async Task HtmlRoutes_DoNotContainVersionPlaceholder(string path)
+    {
+        // Arrange
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = TestBaseAddress
+        });
+
+        // Act
+        var response = await client.GetAsync(path);
+
+        // Assert
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("{{VERSION}}", content);
+    }
+
+    [Fact]
     public async Task BoardRoute_ReturnsHtml()
     {
         // Arrange
