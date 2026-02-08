@@ -24,6 +24,7 @@ A lightweight, privacy-first retrospective tool for teams to collaboratively ref
 - **Card ownership** - Edit your own cards, vote on anyone's
 - **Export to Markdown** - Archive your retrospectives
 - **No accounts** - Anonymous, instant access
+- **Installable PWA** - Works offline, install on any device
 
 ## Project Structure
 

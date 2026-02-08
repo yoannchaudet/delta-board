@@ -1,5 +1,10 @@
 // Main Application Entry Point
 
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+}
+
 import { initLandingPage } from './landing.js';
 import { createConnection } from './connection.js';
 import { createEmptyState, createCard } from './types.js';
@@ -332,6 +337,20 @@ function initBoard(boardId) {
         a.click();
         URL.revokeObjectURL(url);
     });
+
+    // Offline indicator chip
+    const offlineChip = document.getElementById('offline-chip');
+    function updateOfflineChip() {
+        offlineChip.style.display = navigator.onLine ? 'none' : '';
+    }
+    window.addEventListener('online', () => {
+        updateOfflineChip();
+        if (connection.getState() === 'closed') {
+            connection.reconnect();
+        }
+    });
+    window.addEventListener('offline', updateOfflineChip);
+    updateOfflineChip();
 
     // Store for debugging
     window._connection = connection;

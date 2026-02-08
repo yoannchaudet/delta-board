@@ -86,6 +86,30 @@ When deploying to Azure Container Apps:
 
 The release Git tag (e.g. `v1.0.0`) is passed as a Docker build arg (`VERSION`) and baked into the assembly's `InformationalVersion`. At startup, `Program.cs` reads this version and replaces a `{{VERSION}}` placeholder in `index.html` before serving it. The version is displayed in the footer with low-contrast styling. Local dev builds show `0.0.0-dev`.
 
+## Progressive Web App (Offline Support)
+
+Delta Board is a PWA that can be installed and used offline. The service worker caches the full app shell (HTML, JS, CSS, images) so boards can be loaded from localStorage even when the server is unreachable.
+
+### Caching Strategy
+
+- **Navigation requests** (HTML pages): Network-first with cache fallback. The cached `/` response serves all routes since the SPA detects the page from `window.location.pathname`.
+- **Static assets** (JS, CSS, images, favicons): Cache-first. Assets are immutable between deployments; the version-keyed cache handles invalidation.
+- **WebSocket connections**: Pass through untouched (service workers cannot intercept WebSocket upgrades).
+
+### Cache Versioning
+
+The service worker template (`sw.js`) contains a `{{VERSION}}` placeholder that is replaced at startup by `Program.cs`, using the same mechanism as `index.html`. Each deployment produces a uniquely named cache (`deltaboard-v{version}`). On activation, old caches are deleted.
+
+The `/sw.js` route is served with `Cache-Control: no-cache` so the browser always revalidates, detecting new versions via byte comparison.
+
+### Offline Behavior
+
+When offline, the app loads entirely from the service worker cache. Boards display from localStorage as usual. The WebSocket connection fails gracefully — the existing reconnect logic retries with exponential backoff, and an "Offline" chip appears in the header. When connectivity returns, the app auto-reconnects.
+
+### Installability
+
+The web app manifest (`manifest.json`) enables installation on supported platforms. It references existing icon assets and uses the brand yellow (`#fed443`) as the theme color.
+
 ## Limitations by Design
 
 - Maximum 20 concurrent participants per board

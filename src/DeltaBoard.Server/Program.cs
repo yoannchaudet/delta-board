@@ -36,10 +36,12 @@ static void RunApp(string[] args)
     // Serve static files from wwwroot
     app.UseStaticFiles();
 
-    // Read assembly version and prepare index.html with version stamp
+    // Read assembly version and prepare index.html + sw.js with version stamp
     var version = Assembly.GetExecutingAssembly()
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown version";
     var indexHtml = File.ReadAllText(Path.Combine(app.Environment.WebRootPath, "index.html"))
+        .Replace("{{VERSION}}", version);
+    var swJs = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "sw.js"))
         .Replace("{{VERSION}}", version);
 
     // Landing page
@@ -47,6 +49,14 @@ static void RunApp(string[] args)
     {
         context.Response.ContentType = "text/html";
         return context.Response.WriteAsync(indexHtml);
+    });
+
+    // Service worker (version-stamped, must not be cached by browser)
+    app.MapGet("/sw.js", context =>
+    {
+        context.Response.ContentType = "application/javascript";
+        context.Response.Headers.CacheControl = "no-cache";
+        return context.Response.WriteAsync(swJs);
     });
 
     // WS endpoint
