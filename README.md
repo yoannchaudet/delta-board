@@ -50,7 +50,8 @@ delta-board/
 │   ├── DESIGN.md               # Technical design documentation
 │   ├── LIFE_CYCLE.md           # Board phases and transitions
 │   ├── PROTOCOL.md             # WebSocket protocol specification
-│   └── STYLE.md                # Visual identity and brand guidelines
+│   ├── STYLE.md                # Visual identity and brand guidelines
+│   └── DEPLOYMENT.md           # Production deployment guide
 ├── package.json                # JS test tooling
 ├── vitest.config.js
 └── delta-board.sln
@@ -118,6 +119,7 @@ docker run -p 8080:8080 ghcr.io/yoannchaudet/delta-board:1.0.0
 - [docs/LIFE_CYCLE.md](docs/LIFE_CYCLE.md) - Board phases (forming/reviewing) and transitions
 - [docs/PROTOCOL.md](docs/PROTOCOL.md) - WebSocket protocol and message schemas
 - [docs/STYLE.md](docs/STYLE.md) - Visual identity, colors, and brand guidelines
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production deployment on Azure Container Apps
 
 ## License
 
