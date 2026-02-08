@@ -104,7 +104,7 @@ The `/sw.js` route is served with `Cache-Control: no-cache` so the browser alway
 
 ### Offline Behavior
 
-When offline, the app loads entirely from the service worker cache. Boards display from localStorage as usual. The WebSocket connection fails gracefully — the existing reconnect logic retries with exponential backoff, and an "Offline" chip appears in the header. When connectivity returns, the app auto-reconnects.
+When offline, the app loads entirely from the service worker cache. Boards display from localStorage as usual. The WebSocket connection fails gracefully — the existing reconnect logic retries with exponential backoff, and an "Offline" chip appears in the header on all pages (landing and board). The chip reflects browser connectivity (`navigator.onLine`), not WebSocket state — the connection status indicator handles that separately. When connectivity returns, the chip disappears and the app auto-reconnects.
 
 ### Installability
 

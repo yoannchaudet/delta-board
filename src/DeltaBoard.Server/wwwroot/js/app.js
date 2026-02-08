@@ -45,6 +45,15 @@ function getBoardId() {
  * Initialize the application
  */
 function init() {
+    // Offline indicator chip (visible on all pages)
+    const offlineChip = document.getElementById('offline-chip');
+    function updateOfflineChip() {
+        offlineChip.style.display = navigator.onLine ? 'none' : '';
+    }
+    window.addEventListener('online', updateOfflineChip);
+    window.addEventListener('offline', updateOfflineChip);
+    updateOfflineChip();
+
     const page = detectPage();
 
     if (page === 'landing') {
@@ -338,19 +347,12 @@ function initBoard(boardId) {
         URL.revokeObjectURL(url);
     });
 
-    // Offline indicator chip
-    const offlineChip = document.getElementById('offline-chip');
-    function updateOfflineChip() {
-        offlineChip.style.display = navigator.onLine ? 'none' : '';
-    }
+    // Auto-reconnect when browser comes back online
     window.addEventListener('online', () => {
-        updateOfflineChip();
         if (connection.getState() === 'closed') {
             connection.reconnect();
         }
     });
-    window.addEventListener('offline', updateOfflineChip);
-    updateOfflineChip();
 
     // Store for debugging
     window._connection = connection;
