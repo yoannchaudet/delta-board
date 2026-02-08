@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Optimize SVG files and generate favicons from mark.svg
+# Optimize SVG files and generate icons
 # Runs in-place optimization on all .svg files in wwwroot/images
+# Generates favicons from mark.svg and PWA/apple-touch icons from happy-delta.svg
 
 set -e
 
@@ -45,17 +46,15 @@ echo "✓ SVG optimization complete"
 
 # Generate favicons from mark.svg
 MARK_SVG="$IMAGES_DIR/mark.svg"
+HAPPY_SVG="$IMAGES_DIR/happy-delta.svg"
 
 if [ -f "$MARK_SVG" ]; then
     echo ""
     echo "Generating favicons from mark.svg..."
 
-    # Generate PNG favicons at various sizes
+    # Generate PNG favicons from mark.svg (simple logo works well at small sizes)
     rsvg-convert -w 16 -h 16 "$MARK_SVG" -o "$WWWROOT/favicon-16x16.png"
     rsvg-convert -w 32 -h 32 "$MARK_SVG" -o "$WWWROOT/favicon-32x32.png"
-    rsvg-convert -w 180 -h 180 "$MARK_SVG" -o "$WWWROOT/apple-touch-icon.png"
-    rsvg-convert -w 192 -h 192 "$MARK_SVG" -o "$WWWROOT/android-chrome-192x192.png"
-    rsvg-convert -w 512 -h 512 "$MARK_SVG" -o "$WWWROOT/android-chrome-512x512.png"
 
     # Generate multi-size favicon.ico
     magick "$WWWROOT/favicon-32x32.png" "$WWWROOT/favicon-16x16.png" "$WWWROOT/favicon.ico"
@@ -63,13 +62,21 @@ if [ -f "$MARK_SVG" ]; then
     # Copy mark.svg as favicon.svg for modern browsers
     cp "$MARK_SVG" "$WWWROOT/favicon.svg"
 
-    echo "✓ Generated favicon-16x16.png"
-    echo "✓ Generated favicon-32x32.png"
-    echo "✓ Generated apple-touch-icon.png"
-    echo "✓ Generated android-chrome-192x192.png"
-    echo "✓ Generated android-chrome-512x512.png"
+    echo "✓ Generated favicon-16x16.png (from mark.svg)"
+    echo "✓ Generated favicon-32x32.png (from mark.svg)"
     echo "✓ Generated favicon.ico"
     echo "✓ Generated favicon.svg"
+
+    # Generate PWA and apple-touch icons from happy-delta.svg (more detail at larger sizes)
+    echo ""
+    echo "Generating PWA icons from happy-delta.svg..."
+    rsvg-convert -w 180 -h 180 "$HAPPY_SVG" -o "$WWWROOT/apple-touch-icon.png"
+    rsvg-convert -w 192 -h 192 "$HAPPY_SVG" -o "$WWWROOT/android-chrome-192x192.png"
+    rsvg-convert -w 512 -h 512 "$HAPPY_SVG" -o "$WWWROOT/android-chrome-512x512.png"
+
+    echo "✓ Generated apple-touch-icon.png (from happy-delta.svg)"
+    echo "✓ Generated android-chrome-192x192.png (from happy-delta.svg)"
+    echo "✓ Generated android-chrome-512x512.png (from happy-delta.svg)"
 else
     echo ""
     echo "Warning: mark.svg not found, skipping favicon generation"

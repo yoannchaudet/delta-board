@@ -57,6 +57,28 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Contains("Delta Board", content);
     }
 
+    [Fact]
+    public async Task ServiceWorker_ReturnsJavaScriptWithVersion()
+    {
+        // Arrange
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = TestBaseAddress
+        });
+
+        // Act
+        var response = await client.GetAsync("/sw.js");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/javascript", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("no-cache", response.Headers.CacheControl?.ToString());
+
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("{{VERSION}}", content);
+        Assert.Contains("deltaboard-v", content);
+    }
+
     [Theory]
     [InlineData("/")]
     [InlineData("/board/test-board-123")]

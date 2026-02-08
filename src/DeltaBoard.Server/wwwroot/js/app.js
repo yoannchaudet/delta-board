@@ -1,5 +1,10 @@
 // Main Application Entry Point
 
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+}
+
 import { initLandingPage } from './landing.js';
 import { createConnection } from './connection.js';
 import { createEmptyState, createCard } from './types.js';
@@ -40,6 +45,15 @@ function getBoardId() {
  * Initialize the application
  */
 function init() {
+    // Offline indicator chip (visible on all pages)
+    const offlineChip = document.getElementById('offline-chip');
+    function updateOfflineChip() {
+        offlineChip.style.display = navigator.onLine ? 'none' : '';
+    }
+    window.addEventListener('online', updateOfflineChip);
+    window.addEventListener('offline', updateOfflineChip);
+    updateOfflineChip();
+
     const page = detectPage();
 
     if (page === 'landing') {
@@ -331,6 +345,13 @@ function initBoard(boardId) {
         a.download = `${boardId}.md`;
         a.click();
         URL.revokeObjectURL(url);
+    });
+
+    // Auto-reconnect when browser comes back online
+    window.addEventListener('online', () => {
+        if (connection.getState() === 'closed') {
+            connection.reconnect();
+        }
     });
 
     // Store for debugging
