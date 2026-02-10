@@ -47,6 +47,31 @@ Keywords: warm, playful, supportive, simple, human
 | **Highlight Amber** | `#ebb00b` | Illustration highlights |
 | **Shadow Gold**     | `#d19718` | Illustration shading    |
 
+## Dark Theme
+
+Delta Board supports a dark theme that follows OS preference by default and can be manually overridden via a toggle in the header. The user's choice persists in localStorage.
+
+The toggle cycles through three states: **Auto** (follows OS) → **Dark** → **Light** → Auto.
+
+### Dark Palette
+
+| Variable             | Light Value | Dark Value |
+| -------------------- | ----------- | ---------- |
+| `--color-bg`         | `#fef8f5`   | `#1a1a1e`  |
+| `--color-bg-accent`  | `#f5ebe5`   | `#242429`  |
+| `--color-white`      | `#ffffff`   | `#2d2d33`  |
+| `--color-text`       | `#333333`   | `#e0e0e0`  |
+| `--color-text-light` | `#666666`   | `#a0a0a0`  |
+| `--color-brown`      | `#5b4237`   | `#d4a574`  |
+| `--color-border`     | `#e0e0e0`   | `#404048`  |
+| `--color-well`       | `#4caf50`   | `#66bb6a`  |
+| `--color-well-bg`    | `#e8f5e9`   | `#253d28`  |
+| `--color-delta`      | `#f59e0b`   | `#ffa726`  |
+| `--color-delta-bg`   | `#fef3c7`   | `#43372a`  |
+| `--color-error`      | `#f44336`   | `#ef5350`  |
+
+Dark overrides are applied via a `[data-theme="dark"]` selector in `shared.css`. An inline script in `<head>` reads localStorage before CSS loads to prevent a flash of the wrong theme.
+
 ## Typography
 
 **System fonts** - No custom fonts needed. Fast loading, familiar feel.

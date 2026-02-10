@@ -22,14 +22,81 @@
     /* Semantic colors */
     --color-well: #4caf50;
     --color-well-bg: #e8f5e9;
+    --color-well-dark: #2e7d32;
+    --color-well-darker: #1b5e20;
+    --color-well-bg-hover: #c8e6c9;
+    --color-well-bg-active: #a5d6a7;
+    --color-well-hover: #dcedc8;
+    --color-well-dark-hover: #43a047;
+    --color-well-vote-bg: rgba(46, 125, 50, 0.15);
+    --color-well-glow: rgba(76, 175, 80, 0.15);
+    --color-well-glow-strong: rgba(76, 175, 80, 0.3);
+
     --color-delta: #f59e0b;
     --color-delta-bg: #fef3c7;
+    --color-delta-dark: #92400e;
+    --color-delta-hover: #fdedb8;
+    --color-delta-vote-bg: rgba(255, 152, 0, 0.15);
+    --color-delta-glow: rgba(245, 158, 11, 0.15);
+    --color-delta-glow-strong: rgba(245, 158, 11, 0.3);
+
     --color-vote: #ff9800;
     --color-error: #f44336;
+
+    /* Overlays */
+    --color-overlay-subtle: rgba(0, 0, 0, 0.06);
+    --color-overlay-light: rgba(0, 0, 0, 0.08);
+    --color-overlay-medium: rgba(0, 0, 0, 0.15);
+    --color-overlay: rgba(0, 0, 0, 0.3);
 
     /* Effects */
     --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     --radius: 8px;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] {
+    --color-brand: #fed443;
+    --color-brand-dark: #d4a020;
+    --color-brand-highlight: #f0be0a;
+
+    --color-bg: #1a1a1e;
+    --color-bg-accent: #242429;
+    --color-white: #2d2d33;
+    --color-text: #e0e0e0;
+    --color-text-light: #a0a0a0;
+    --color-brown: #d4a574;
+    --color-border: #404048;
+
+    --color-well: #66bb6a;
+    --color-well-bg: #253d28;
+    --color-well-dark: #81c784;
+    --color-well-darker: #a5d6a7;
+    --color-well-bg-hover: #304a34;
+    --color-well-bg-active: #3a5840;
+    --color-well-hover: #2e4a32;
+    --color-well-dark-hover: #66bb6a;
+    --color-well-vote-bg: rgba(102, 187, 106, 0.2);
+    --color-well-glow: rgba(102, 187, 106, 0.15);
+    --color-well-glow-strong: rgba(102, 187, 106, 0.3);
+
+    --color-delta: #ffa726;
+    --color-delta-bg: #43372a;
+    --color-delta-dark: #ffcc80;
+    --color-delta-hover: #504334;
+    --color-delta-vote-bg: rgba(255, 167, 38, 0.2);
+    --color-delta-glow: rgba(255, 167, 38, 0.15);
+    --color-delta-glow-strong: rgba(255, 167, 38, 0.3);
+
+    --color-vote: #ffa726;
+    --color-error: #ef5350;
+
+    --color-overlay-subtle: rgba(255, 255, 255, 0.06);
+    --color-overlay-light: rgba(255, 255, 255, 0.08);
+    --color-overlay-medium: rgba(255, 255, 255, 0.15);
+    --color-overlay: rgba(0, 0, 0, 0.5);
+
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 body {
