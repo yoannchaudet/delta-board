@@ -1,7 +1,7 @@
 // Main Application Entry Point
 
-// Register service worker for offline support
-if ('serviceWorker' in navigator) {
+// Register service worker for offline support (skip on localhost to avoid stale caches during dev)
+if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
     navigator.serviceWorker.register('/sw.js');
 }
 
