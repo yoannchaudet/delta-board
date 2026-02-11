@@ -129,26 +129,48 @@ The mascots have:
 **Primary** (Create, main actions)
 
 ```css
-background: #fed443;
+background: var(--color-brand);
 color: #5b4237;
+border: 1px solid var(--color-brand-dark);
 padding: 0.75rem 1.5rem;
 border-radius: 8px;
 font-weight: 600;
 ```
 
+Hover lifts with `translateY(-2px)` and shadow rather than changing color.
+
 **Secondary** (Export, minor actions)
 
 ```css
-background: #5b4237;
-color: white;
+background: var(--color-brown);
+color: var(--color-white);
+```
+
+**Ghost/Bordered** (Theme toggle, Export Markdown)
+
+```css
+height: 2rem;
+background: transparent;
+border: 1px solid var(--color-border);
+border-radius: 8px;
+color: var(--color-text-light);
 ```
 
 **Ghost/Dashed** (Add card)
 
 ```css
 background: transparent;
-border: 2px dashed #e0e0e0;
-color: #666666;
+border: 2px dashed var(--color-border);
+color: var(--color-text-light);
+```
+
+**Tinted** (I'm ready, Reconnect)
+
+```css
+height: 2rem;
+background: var(--color-well-bg); /* or var(--color-error) for reconnect */
+border: 1px solid var(--color-well); /* or var(--color-error) */
+color: var(--color-well-dark);
 ```
 
 ### Status Indicators
