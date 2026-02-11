@@ -84,10 +84,8 @@ header {
 }
 
 .app-version {
-    display: block;
-    font-size: 0.65rem;
-    color: var(--color-border);
-    margin-top: 0.25rem;
+    color: var(--color-text-light);
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 .header-actions {
