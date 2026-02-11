@@ -10,6 +10,18 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#fed443">
+    <script>
+      // Anti-FOUC: apply theme before CSS loads
+      (function() {
+        var p = localStorage.getItem('theme-preference') || 'auto';
+        var dark = p === 'dark' || (p === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        if (dark) {
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.content = '#1a1a1e';
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="/css/shared.css">
     <link rel="stylesheet" href="/css/styles.css">
 </head>
@@ -30,11 +42,12 @@
             <span id="offline-chip" class="phase-chip offline-chip" style="display: none;">Offline</span>
         </div>
         <div class="header-actions">
-            <button id="ready-btn" class="btn-ready" style="display: none;"><span class="btn-ready-check">&#x2714;</span> I'm ready</button>
-            <button id="download-btn" class="btn-export" style="display: none;">&#x2B07;&#xFE0E; Export Markdown</button>
             <span id="participant-count" class="participant-count" style="display: none;"><span id="participant-number" class="participant-number"></span> online<span id="ready-count" class="ready-count"></span></span>
             <span id="connection-status" class="status-indicator"></span>
             <button id="reconnect-btn" class="btn-reconnect" style="display: none;">Reconnect</button>
+            <button id="download-btn" class="btn-export" style="display: none;">&#x2B07;&#xFE0E; Export Markdown</button>
+            <button id="ready-btn" class="btn-ready" style="display: none;"><span class="btn-ready-check">&#x2714;</span> I'm ready</button>
+            <button id="theme-toggle" class="btn-theme-toggle" aria-label="Theme: Auto" title="Theme: Auto">&#x25D1;</button>
         </div>
     </header>
 
@@ -109,8 +122,7 @@
     </main>
 
     <footer>
-        <p>&copy; 2026 <a href="https://mavensoul.studio" target="_blank" rel="noopener">Maven Soul Studio</a>. <a href="https://github.com/yoannchaudet/delta-board" target="_blank" rel="noopener">Code</a> licensed under the <a href="https://github.com/yoannchaudet/delta-board/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>.</p>
-        <span class="app-version">{{VERSION}}</span>
+        <p>&copy; 2026 <a href="https://mavensoul.studio" target="_blank" rel="noopener">Maven Soul Studio</a>. <a href="https://github.com/yoannchaudet/delta-board" target="_blank" rel="noopener">Code</a> licensed under the <a href="https://github.com/yoannchaudet/delta-board/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>. <span class="app-version">&middot; {{VERSION}}</span></p>
     </footer>
 
     <script type="module" src="/js/app.js"></script>

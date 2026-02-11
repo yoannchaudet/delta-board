@@ -8,6 +8,7 @@ const APP_SHELL = [
   '/css/shared.css',
   '/css/styles.css',
   '/js/app.js',
+  '/js/theme.js',
   '/js/board.js',
   '/js/connection.js',
   '/js/dedup.js',

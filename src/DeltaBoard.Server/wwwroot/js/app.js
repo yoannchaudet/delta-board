@@ -1,10 +1,11 @@
 // Main Application Entry Point
 
-// Register service worker for offline support
-if ('serviceWorker' in navigator) {
+// Register service worker for offline support (skip on localhost to avoid stale caches during dev)
+if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
     navigator.serviceWorker.register('/sw.js');
 }
 
+import { toggleTheme } from './theme.js';
 import { initLandingPage } from './landing.js';
 import { createConnection } from './connection.js';
 import { createEmptyState, createCard } from './types.js';
@@ -45,6 +46,9 @@ function getBoardId() {
  * Initialize the application
  */
 function init() {
+    // Theme toggle (visible on all pages)
+    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
     // Offline indicator chip (visible on all pages)
     const offlineChip = document.getElementById('offline-chip');
     function updateOfflineChip() {

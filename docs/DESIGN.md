@@ -110,6 +110,14 @@ When offline, the app loads entirely from the service worker cache. Boards displ
 
 The web app manifest (`manifest.json`) enables installation on supported platforms. It references existing icon assets and uses the brand yellow (`#fed443`) as the theme color.
 
+## Theme Support
+
+Delta Board supports light and dark themes. The theme follows the operating system preference by default (`prefers-color-scheme`) and can be manually overridden via a toggle button in the header. The user's choice (`auto`, `light`, or `dark`) persists in `localStorage` under the key `theme-preference`.
+
+To prevent a flash of the wrong theme on page load, a small inline script in `<head>` reads localStorage and sets the `data-theme` attribute on `<html>` before any CSS is parsed.
+
+All colors are defined as CSS custom properties in `shared.css`. The dark palette is applied via a `[data-theme="dark"]` selector that overrides the `:root` values.
+
 ## Limitations by Design
 
 - Maximum 20 concurrent participants per board
