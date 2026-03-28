@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `README.md` - Project overview, philosophy, and getting started commands
 - `docs/DESIGN.md` - Architecture, tech stack, and design constraints
+- `docs/DEPLOYMENT.md` - Production deployment on Azure Container Apps
 
 ## Guidelines
 
