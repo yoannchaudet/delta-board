@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -77,6 +78,35 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         var content = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain("{{VERSION}}", content);
         Assert.Contains("deltaboard-v", content);
+    }
+
+    [Fact]
+    public async Task ServiceWorker_AppShellAssetsExist()
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = TestBaseAddress
+        });
+        var serviceWorker = await client.GetStringAsync("/sw.js");
+        var appShell = Regex.Match(
+            serviceWorker,
+            @"const APP_SHELL = \[(?<assets>.*?)\];",
+            RegexOptions.Singleline);
+
+        Assert.True(appShell.Success, "The service worker must declare APP_SHELL.");
+
+        var paths = Regex.Matches(appShell.Groups["assets"].Value, @"'(?<path>/[^']*)'")
+            .Select(match => match.Groups["path"].Value)
+            .ToArray();
+
+        Assert.NotEmpty(paths);
+        foreach (var path in paths)
+        {
+            var response = await client.GetAsync(path);
+            Assert.True(
+                response.IsSuccessStatusCode,
+                $"App-shell asset '{path}' returned {(int)response.StatusCode}.");
+        }
     }
 
     [Theory]

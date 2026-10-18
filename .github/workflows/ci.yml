@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: Generate Linux visual baselines as a downloadable artifact
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -46,6 +53,85 @@ jobs:
 
       - name: Test
         run: npm test
+
+  browser:
+    name: Browser (Chromium)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test
+        if: ${{ !inputs.update_snapshots }}
+        run: npm run test:browser
+
+      - name: Generate Linux visual baselines
+        if: ${{ inputs.update_snapshots }}
+        run: npm run test:browser:update
+
+      - name: Upload generated visual baselines
+        if: ${{ always() && inputs.update_snapshots }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines-linux
+          path: tests/browser/__screenshots__/
+          retention-days: 7
+
+      - name: Upload browser failure artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-failure
+          path: |
+            playwright-report/
+            test-results/
+            tests/browser/__screenshots__/
+          retention-days: 7
+
+  browser-cross:
+    name: Browser (Firefox + WebKit)
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browsers
+        run: npx playwright install --with-deps firefox webkit
+
+      - name: Test
+        run: npm run test:browser:cross
 
   container:
     name: Container (build)

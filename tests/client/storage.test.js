@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getAllBoards, deleteBoard, hasBoards } from '../../src/DeltaBoard.Server/wwwroot/js/storage.js';
+import {
+    getAllBoards,
+    deleteBoard,
+    getClientId,
+    hasBoards,
+    loadBoard,
+    saveBoard
+} from '../../src/DeltaBoard.Server/wwwroot/js/storage.js';
 
 describe('storage', () => {
     // Mock localStorage
@@ -158,6 +165,61 @@ describe('storage', () => {
             });
 
             expect(hasBoards()).toBe(true);
+        });
+    });
+
+    describe('board persistence', () => {
+        it('round-trips the supported board schema', () => {
+            const state = {
+                version: 1,
+                phase: 'reviewing',
+                cards: [{ id: 'card-1', text: 'Keep this', createdAt: 1000 }],
+                votes: [{ id: 'vote-1', cardId: 'card-1', isDeleted: false }]
+            };
+
+            saveBoard('test-board', state);
+
+            expect(loadBoard('test-board')).toEqual(state);
+            expect(JSON.parse(mockStorage['deltaboard-test-board']).lastModified)
+                .toEqual(expect.any(Number));
+        });
+
+        it('returns null for missing, corrupt, or structurally invalid boards', () => {
+            expect(loadBoard('missing')).toBeNull();
+
+            mockStorage['deltaboard-corrupt'] = '{';
+            mockStorage['deltaboard-invalid'] = JSON.stringify({
+                phase: 'forming',
+                cards: [],
+                votes: null
+            });
+
+            expect(loadBoard('corrupt')).toBeNull();
+            expect(loadBoard('invalid')).toBeNull();
+        });
+
+        it('surfaces storage write failures', () => {
+            global.localStorage.setItem = () => {
+                throw new DOMException('Storage quota exceeded', 'QuotaExceededError');
+            };
+
+            expect(() => saveBoard('test-board', {
+                version: 1,
+                phase: 'forming',
+                cards: [],
+                votes: []
+            })).toThrowError(/Storage quota exceeded/);
+        });
+    });
+
+    describe('client identity', () => {
+        it('creates and reuses one persistent client identity', () => {
+            const first = getClientId();
+            const second = getClientId();
+
+            expect(first).toMatch(/^client-\d+-[a-z0-9]+$/);
+            expect(second).toBe(first);
+            expect(mockStorage['deltaboard-client-id']).toBe(first);
         });
     });
 });

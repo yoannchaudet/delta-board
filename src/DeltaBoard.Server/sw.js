@@ -15,6 +15,7 @@ const APP_SHELL = [
   '/js/landing.js',
   '/js/merge.js',
   '/js/operations.js',
+  '/js/review.js',
   '/js/storage.js',
   '/js/sync.js',
   '/js/types.js',
