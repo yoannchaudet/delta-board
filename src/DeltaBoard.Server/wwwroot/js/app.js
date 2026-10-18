@@ -13,6 +13,7 @@ import { applyCardOp, applyVote, getVisibleCards, getVoteCount, hasVoted } from 
 import { saveBoard, loadBoard } from './storage.js';
 import { createSyncManager } from './sync.js';
 import { createDedup } from './dedup.js';
+import { generateMarkdown, quorumNeeded } from './review.js';
 import {
     validateIncomingCardOp,
     validateIncomingVoteOp,
@@ -302,46 +303,8 @@ function initBoard(boardId) {
         renderBoard();
     }
 
-    function formatCardMarkdown(card) {
-        const votes = getVoteCount(state, card.id);
-        const voteLabel = votes === 1 ? '1 vote' : `${votes} votes`;
-        const lines = card.text.split('\n');
-        const first = `- ${lines[0]}`;
-        const rest = lines.slice(1).map(line => line ? `  ${line}` : '');
-        return [first, ...rest].join('\n\n') + ` (${voteLabel})\n`;
-    }
-
-    function generateMarkdown() {
-        const wellCards = getVisibleCards(state, 'well')
-            .sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
-        const deltaCards = getVisibleCards(state, 'delta')
-            .sort((a, b) => getVoteCount(state, b.id) - getVoteCount(state, a.id));
-
-        let md = `# ${boardId}\n\n`;
-
-        md += '## What Went Well\n\n';
-        if (wellCards.length === 0) {
-            md += '_No cards._\n';
-        } else {
-            for (const card of wellCards) {
-                md += formatCardMarkdown(card);
-            }
-        }
-
-        md += '\n## Delta\n\n';
-        if (deltaCards.length === 0) {
-            md += '_No cards._\n';
-        } else {
-            for (const card of deltaCards) {
-                md += formatCardMarkdown(card);
-            }
-        }
-
-        return md;
-    }
-
     document.getElementById('download-btn').addEventListener('click', () => {
-        const md = generateMarkdown();
+        const md = generateMarkdown(boardId, state);
         const blob = new Blob([md], { type: 'text/markdown' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -702,16 +665,6 @@ function initBoard(boardId) {
             }
         }
     }
-}
-
-/**
- * Calculate the readiness quorum needed for a given participant count
- * @param {number} participantCount
- * @returns {number}
- */
-function quorumNeeded(participantCount) {
-    if (participantCount <= 2) return participantCount;
-    return Math.ceil(0.6 * participantCount);
 }
 
 /**

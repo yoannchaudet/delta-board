@@ -78,7 +78,30 @@ dotnet test
 # Client tests (JavaScript)
 npm install
 npm test
+
+# Browser regression tests (Chromium desktop, mobile, and breakpoint views)
+npx playwright install chromium
+npm run test:browser
+
+# Cross-browser behavior checks
+npx playwright install firefox webkit
+npm run test:browser:cross
 ```
+
+The browser suite starts the ASP.NET application, exercises multi-participant workflows,
+checks accessibility and offline behavior, and compares reviewed visual baselines.
+Linux CI is the authority for visual comparisons; macOS runs skip screenshot assertions.
+To create candidate Linux baselines after the workflow is available on the default
+branch, run:
+
+```bash
+gh workflow run ci.yml --ref <branch> -f update_snapshots=true
+```
+
+Download and review the `visual-baselines-linux` artifact before committing changed
+images. Run `npm run test:browser:update` directly only in a matching Linux environment.
+When bootstrapping the workflow before dispatch is available on the default branch, the
+first pull-request run stores missing Linux snapshots in the `browser-failure` artifact.
 
 ### Run with Docker
 
