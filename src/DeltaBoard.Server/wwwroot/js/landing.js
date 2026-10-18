@@ -55,9 +55,8 @@ function renderBoardsList() {
  * @returns {HTMLElement}
  */
 function createBoardCard(board) {
-    const card = document.createElement('a');
+    const card = document.createElement('div');
     card.className = 'board-card';
-    card.href = `/board/${board.id}`;
 
     const cardCountText = board.cardCount === 1 ? '1 card' : `${board.cardCount} cards`;
     const voteCountText = board.voteCount === 1 ? '1 vote' : `${board.voteCount} votes`;
@@ -66,30 +65,29 @@ function createBoardCard(board) {
         ? '<span class="phase-chip">Reviewing</span>'
         : '';
     const cloneButton = isReviewing
-        ? '<button class="btn-card-action board-card-clone" title="Clone board">Clone</button>'
+        ? `<button class="btn-card-action board-card-clone" aria-label="Clone board ${escapeHtml(board.id)}">Clone</button>`
         : '';
 
     card.innerHTML = `
-        <div class="board-card-content">
-            <h3 class="board-card-title">${escapeHtml(board.id)}${reviewingChip}</h3>
-            <div class="board-card-meta">
-                <span>${cardCountText}</span>
-                <span>·</span>
-                <span>${voteCountText}</span>
+        <a class="board-card-link" href="/board/${encodeURIComponent(board.id)}">
+            <div class="board-card-content">
+                <h3 class="board-card-title">${escapeHtml(board.id)}${reviewingChip}</h3>
+                <div class="board-card-meta">
+                    <span>${cardCountText}</span>
+                    <span>·</span>
+                    <span>${voteCountText}</span>
+                </div>
             </div>
-        </div>
+        </a>
         <div class="board-card-actions">
             ${cloneButton}
-            <button class="btn-card-action btn-delete board-card-delete" title="Delete board">Delete</button>
+            <button class="btn-card-action btn-delete board-card-delete" aria-label="Delete board ${escapeHtml(board.id)}">Delete</button>
         </div>
     `;
 
     const cloneBtn = card.querySelector('.board-card-clone');
     if (cloneBtn) {
         cloneBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
             const state = loadBoard(board.id);
             if (!state) {
                 return;
@@ -109,12 +107,8 @@ function createBoardCard(board) {
         });
     }
 
-    // Prevent navigation when clicking delete button
     const deleteBtn = card.querySelector('.board-card-delete');
     deleteBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
         if (confirm(`Delete board "${board.id}"? This cannot be undone.`)) {
             deleteBoard(board.id);
             renderBoardsList();

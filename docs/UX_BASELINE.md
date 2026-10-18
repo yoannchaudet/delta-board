@@ -77,19 +77,10 @@ votes. Empty columns contain `_No cards._`; deleted cards are omitted.
   accessible names/states, reflow, contrast, and target size are product requirements.
   Automated axe checks are a regression gate, not proof of WCAG conformance.
 
-Card edit and delete controls currently depend on hover and are not operable on a
-touch-only viewport. This is an **existing defect**; mobile browser coverage exercises
-creation, synchronization, and voting but does not accept the inaccessible controls as
-the desired contract.
-
-The application currently runs transitions and animations even when the operating
-system requests reduced motion. This is an **existing defect** tracked by a pending
-browser assertion; the current suite must not report reduced-motion support as passing.
-
-Automated checks also track an **existing defect** in the review-phase vote badge's
-color contrast. Accessibility work must remove this narrow exception rather than expand
-the allowlist. The 404 page also lacks a main landmark, which produces the tracked
-`landmark-one-main` and `region` violations.
+Card actions remain visible and operable on touch-only viewports and when keyboard focus
+enters a card. The application disables transitions and animations when the operating
+system requests reduced motion. Automated checks require accessible review vote badges
+and a main landmark on the 404 page.
 
 ## Offline and PWA
 

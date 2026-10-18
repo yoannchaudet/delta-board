@@ -103,6 +103,7 @@ function initBoard(boardId) {
 
     // Editing state - null when creating new, card object when editing
     let editingCard = null;
+    let editingOriginCardId = null;
 
     // Ready state
     let isReady = false;
@@ -156,6 +157,7 @@ function initBoard(boardId) {
                 // Reset ready state (server forgets on reconnect)
                 isReady = false;
                 readyBtn.classList.remove('active');
+                readyBtn.setAttribute('aria-pressed', 'false');
                 // Start sync window when connection becomes ready
                 syncManager.startSync();
             } else if (connState === 'disconnected' || connState === 'closed') {
@@ -260,6 +262,7 @@ function initBoard(boardId) {
     readyBtn.addEventListener('click', () => {
         isReady = !isReady;
         readyBtn.classList.toggle('active', isReady);
+        readyBtn.setAttribute('aria-pressed', String(isReady));
         connection.send({ type: 'setReady', isReady });
     });
 
@@ -284,6 +287,15 @@ function initBoard(boardId) {
     }
 
     function enterReviewPhase() {
+        const activeElement = document.activeElement;
+        const shouldMoveFocus = document.querySelector('.card-input').contains(activeElement)
+            || quorumWrapper.contains(activeElement)
+            || readyBtn === activeElement
+            || Boolean(activeElement.closest?.('.card'));
+        if (editingCard) {
+            clearEditingState(false);
+        }
+
         state.phase = 'reviewing';
         currentPhase = 'reviewing';
         saveBoard(boardId, state);
@@ -297,10 +309,18 @@ function initBoard(boardId) {
         document.getElementById('ready-count').innerHTML = '';
 
         // Show phase chip and export button
-        document.getElementById('phase-chip').style.display = '';
+        const phaseChip = document.getElementById('phase-chip');
+        phaseChip.style.display = '';
+        phaseChip.setAttribute('aria-label', 'Board phase: Reviewing');
         document.getElementById('download-btn').style.display = '';
 
         renderBoard();
+        announce('Review phase started. Cards and votes are now frozen.');
+
+        if (shouldMoveFocus) {
+            phaseChip.tabIndex = -1;
+            phaseChip.focus();
+        }
     }
 
     document.getElementById('download-btn').addEventListener('click', () => {
@@ -399,12 +419,17 @@ function initBoard(boardId) {
         const opId = connection.broadcast(op);
         dedup.markSeen(opId);
 
-        // Clear editing state and input
+        const wasEditing = Boolean(editingCard);
         clearEditingState();
+        announce(wasEditing
+            ? `Card saved to ${column === 'well' ? 'What Went Well' : 'Delta'}.`
+            : `Card added to ${column === 'well' ? 'What Went Well' : 'Delta'}.`);
     }
 
-    function clearEditingState() {
+    function clearEditingState(restoreFocus = true) {
+        const cardIdToRestore = editingOriginCardId;
         editingCard = null;
+        editingOriginCardId = null;
         cardInputText.value = '';
         cardInputText.classList.remove('editing-well', 'editing-delta');
         cardInputBar.classList.remove('editing-well', 'editing-delta');
@@ -414,16 +439,18 @@ function initBoard(boardId) {
         wellBtnLabel.textContent = 'Add to Went Well';
         deltaBtnLabel.textContent = 'Add to Delta';
         updateAddButtonStates();
+
+        if (restoreFocus && cardIdToRestore) {
+            focusCardAction(cardIdToRestore, 'edit');
+        }
     }
 
     cardInputCancel.addEventListener('click', () => {
         clearEditingState();
-        cardInputText.blur();
     });
 
     editOverlay.addEventListener('click', () => {
         clearEditingState();
-        cardInputText.blur();
     });
 
     addWellBtn.addEventListener('click', () => submitCard('well'));
@@ -434,7 +461,6 @@ function initBoard(boardId) {
         if (e.key === 'Escape') {
             e.preventDefault();
             clearEditingState();
-            cardInputText.blur();
             return;
         }
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -463,8 +489,30 @@ function initBoard(boardId) {
     }
 
     function renderBoard() {
+        const focusedCardAction = getFocusedCardAction();
         renderColumn(wellCardsEl, 'well');
         renderColumn(deltaCardsEl, 'delta');
+        if (focusedCardAction) {
+            focusCardAction(focusedCardAction.cardId, focusedCardAction.action);
+        }
+    }
+
+    function getCardElement(cardId) {
+        return [...document.querySelectorAll('.card')]
+            .find(card => card.dataset.cardId === cardId);
+    }
+
+    function getFocusedCardAction() {
+        const activeElement = document.activeElement;
+        const card = activeElement?.closest?.('.card');
+        const action = activeElement?.dataset?.focusAction;
+        return card && action ? { cardId: card.dataset.cardId, action } : null;
+    }
+
+    function focusCardAction(cardId, action) {
+        getCardElement(cardId)
+            ?.querySelector(`[data-focus-action="${action}"]`)
+            ?.focus();
     }
 
     function renderColumn(container, column) {
@@ -485,6 +533,8 @@ function initBoard(boardId) {
         const el = document.createElement('div');
         el.className = 'card';
         el.dataset.cardId = card.id;
+        el.setAttribute('role', 'group');
+        el.setAttribute('aria-label', `Card: ${card.text}`);
 
         // Card body with content and vote button
         const body = document.createElement('div');
@@ -506,6 +556,7 @@ function initBoard(boardId) {
             const voteBadge = document.createElement('span');
             voteBadge.className = 'card-votes';
             voteBadge.textContent = String(voteCount);
+            voteBadge.setAttribute('aria-label', `${voteCount} ${voteCount === 1 ? 'vote' : 'votes'}`);
 
             body.appendChild(content);
             body.appendChild(voteBadge);
@@ -516,12 +567,23 @@ function initBoard(boardId) {
         const voteBtn = document.createElement('button');
         voteBtn.className = 'card-votes' + (voted ? ' voted' : '');
         voteBtn.textContent = String(voteCount);
+        voteBtn.dataset.focusAction = 'vote';
+        voteBtn.setAttribute('aria-pressed', String(voted));
+        const voteCountLabel = `${voteCount} ${voteCount === 1 ? 'vote' : 'votes'}`;
         if (isOwnCard) {
             voteBtn.disabled = true;
             voteBtn.classList.add('disabled');
             voteBtn.title = "Can't vote on your own card";
+            voteBtn.setAttribute(
+                'aria-label',
+                `${voteCountLabel}. Voting unavailable for your card: ${card.text}`
+            );
         } else {
             voteBtn.title = voted ? 'Remove vote' : 'Vote';
+            voteBtn.setAttribute(
+                'aria-label',
+                `${voteCountLabel}. ${voted ? 'Remove vote from' : 'Vote for'}: ${card.text}`
+            );
             voteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 handleVote(card, voted);
@@ -540,6 +602,8 @@ function initBoard(boardId) {
             const editBtn = document.createElement('button');
             editBtn.className = 'btn-card-action';
             editBtn.textContent = 'Edit';
+            editBtn.dataset.focusAction = 'edit';
+            editBtn.setAttribute('aria-label', `Edit card: ${card.text}`);
             editBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 handleEditCard(card);
@@ -548,6 +612,8 @@ function initBoard(boardId) {
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'btn-card-action btn-delete';
             deleteBtn.textContent = 'Delete';
+            deleteBtn.dataset.focusAction = 'delete';
+            deleteBtn.setAttribute('aria-label', `Delete card: ${card.text}`);
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 handleDeleteCard(card);
@@ -593,6 +659,7 @@ function initBoard(boardId) {
     function handleEditCard(card) {
         // Set editing state
         editingCard = card;
+        editingOriginCardId = card.id;
 
         // Load card text into textarea
         cardInputText.value = card.text;
@@ -621,7 +688,11 @@ function initBoard(boardId) {
         cardInputText.select();
 
         // Scroll to input
-        cardInputText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        cardInputText.scrollIntoView({
+            behavior: reduceMotion ? 'auto' : 'smooth',
+            block: 'center'
+        });
     }
 
     function handleDeleteCard(card) {
@@ -664,7 +735,26 @@ function initBoard(boardId) {
                 dedup.markSeen(voteOpId);
             }
         }
+
+        const columnHeading = document.querySelector(
+            `.column[data-column="${card.column}"] .column-header h2`
+        );
+        columnHeading.tabIndex = -1;
+        columnHeading.focus();
+        announce('Card deleted.');
     }
+}
+
+let announcementTimeout;
+
+function announce(message) {
+    const announcer = document.getElementById('app-announcer');
+    if (!announcer) return;
+    clearTimeout(announcementTimeout);
+    announcer.textContent = '';
+    announcementTimeout = setTimeout(() => {
+        announcer.textContent = message;
+    }, 50);
 }
 
 /**
@@ -734,9 +824,13 @@ function updateConnectionStatus(el, state) {
         closed: 'status-indicator disconnected'
     };
 
-    el.textContent = '';
+    const statusText = tooltips[state] || 'Unknown';
+    const accessibleStatus = document.createElement('span');
+    accessibleStatus.className = 'visually-hidden';
+    accessibleStatus.textContent = `Connection status: ${statusText}`;
+    el.replaceChildren(accessibleStatus);
     el.className = classes[state] || 'status-indicator';
-    el.title = tooltips[state] || '';
+    el.title = statusText;
 
     // Show reconnect button only when permanently disconnected
     const reconnectBtn = document.getElementById('reconnect-btn');
