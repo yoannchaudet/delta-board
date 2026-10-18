@@ -18,7 +18,8 @@ for (const theme of ['light', 'dark']) {
 
     await expect(page).toHaveScreenshot(`landing-${theme}.png`, {
       animations: 'disabled',
-      fullPage: true
+      fullPage: true,
+      mask: [page.locator('.app-version')]
     });
   });
 
