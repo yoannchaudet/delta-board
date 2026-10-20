@@ -42,6 +42,10 @@
 
     --color-vote: #ff9800;
     --color-error: #f44336;
+    --color-on-accent: #ffffff;
+    --color-brand-ink: #5b4237;
+    --color-on-accent-muted: rgba(255, 255, 255, 0.25);
+    --color-on-accent-strong: rgba(255, 255, 255, 0.45);
 
     /* Overlays */
     --color-overlay-subtle: rgba(0, 0, 0, 0.06);
@@ -49,9 +53,64 @@
     --color-overlay-medium: rgba(0, 0, 0, 0.15);
     --color-overlay: rgba(0, 0, 0, 0.3);
 
-    /* Effects */
-    --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    --radius: 8px;
+    /* Typography */
+    --font-family-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    --font-family-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    --font-size-2xs: 0.7rem;
+    --font-size-xs: 0.75rem;
+    --font-size-caption: 0.775rem;
+    --font-size-compact: 0.8rem;
+    --font-size-control: 0.8125rem;
+    --font-size-detail: 0.85rem;
+    --font-size-sm: 0.875rem;
+    --font-size-button: 0.9rem;
+    --font-size-body: 1rem;
+    --font-size-lead: 1.1rem;
+    --font-size-heading-sm: 1.25rem;
+    --font-size-heading-md: 1.5rem;
+    --font-size-heading-lg: 1.75rem;
+    --font-weight-light: 300;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --line-height-control: 1;
+    --line-height-heading: 1.2;
+    --line-height-body: 1.5;
+    --letter-spacing-label: 0.02em;
+    --letter-spacing-caps: 0.05em;
+
+    /* Spacing */
+    --space-3xs: 0.125rem;
+    --space-2xs: 0.25rem;
+    --space-xs: 0.375rem;
+    --space-sm: 0.5rem;
+    --space-md: 0.75rem;
+    --space-lg: 1rem;
+    --space-xl: 1.25rem;
+    --space-2xl: 1.5rem;
+    --space-3xl: 2rem;
+    --space-4xl: 3rem;
+    --space-chip-block: 0.15rem;
+    --space-copy-block: 0.2rem;
+    --space-button-block: 0.6rem;
+    --space-button-inline: 0.625rem;
+
+    /* Shape, elevation, and focus */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-pill: 100px;
+    --radius-round: 50%;
+    --shadow-surface: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-raised: 0 4px 12px var(--color-overlay-medium);
+    --shadow-well-raised: 0 4px 12px var(--color-well-glow-strong);
+    --shadow-delta-raised: 0 4px 12px var(--color-delta-glow-strong);
+    --shadow-well-vote: 0 2px 4px var(--color-well-glow-strong);
+    --shadow-delta-vote: 0 2px 4px var(--color-delta-glow-strong);
+    --shadow-focus-well: 0 0 0 3px var(--color-well-glow);
+    --shadow-focus-delta: 0 0 0 3px var(--color-delta-glow);
+    --focus-outline-width: 3px;
+    --focus-outline-style: solid;
+    --focus-outline-offset: 3px;
 }
 
 /* Dark theme overrides */
@@ -96,11 +155,11 @@
     --color-overlay-medium: rgba(255, 255, 255, 0.15);
     --color-overlay: rgba(0, 0, 0, 0.5);
 
-    --shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-surface: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    font-family: var(--font-family-sans);
     background-color: var(--color-bg);
     color: var(--color-text);
     min-height: 100vh;
@@ -126,8 +185,8 @@ main, footer {
 }
 
 :focus-visible {
-    outline: 3px solid var(--color-text);
-    outline-offset: 3px;
+    outline: var(--focus-outline-width) var(--focus-outline-style) var(--color-text);
+    outline-offset: var(--focus-outline-offset);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -144,9 +203,9 @@ main, footer {
 /* Footer */
 footer {
     margin-top: auto;
-    padding: 1.5rem 2rem;
+    padding: var(--space-2xl) var(--space-3xl);
     text-align: center;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--color-text-light);
 }
 
