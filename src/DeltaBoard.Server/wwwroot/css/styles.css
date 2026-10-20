@@ -58,7 +58,7 @@ header {
 .phase-chip {
     font-size: 0.7rem;
     font-weight: 500;
-    color: var(--color-text-light);
+    color: var(--color-text);
     background-color: var(--color-border);
     padding: 0.15rem 0.5rem;
     border-radius: 100px;
@@ -639,6 +639,12 @@ header {
     border: none;
 }
 
+.column[data-column] .card-votes:not(button) {
+    color: var(--color-text);
+    background-color: var(--color-overlay-light);
+    border: 1px solid var(--color-border);
+}
+
 button.card-votes {
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.1s;
@@ -743,7 +749,8 @@ button.card-votes:active {
     margin-top: -0.5rem; /* Compensate for card gap when hidden */
 }
 
-.card:hover .card-actions {
+.card:hover .card-actions,
+.card:focus-within .card-actions {
     max-height: 2rem;
     opacity: 1;
     margin-top: 0;
@@ -751,6 +758,8 @@ button.card-votes:active {
 
 .btn-card-action {
     padding: 0.25rem 0.5rem;
+    min-width: 2rem;
+    min-height: 2rem;
     font-size: 0.75rem;
     border: none;
     border-radius: 4px;
@@ -838,15 +847,23 @@ button.card-votes:active {
     padding: 1rem;
     background-color: var(--color-bg);
     border-radius: var(--radius);
-    text-decoration: none;
-    color: inherit;
     transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 
-.board-card:hover {
+.board-card:hover,
+.board-card:focus-within {
     background-color: var(--color-bg-accent);
     box-shadow: 0 4px 12px var(--color-overlay-medium);
     transform: translateY(-2px);
+}
+
+.board-card-link {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
 }
 
 .board-card-content {
@@ -876,8 +893,21 @@ button.card-votes:active {
     transition: opacity 0.2s;
 }
 
-.board-card:hover .board-card-actions {
+.board-card:hover .board-card-actions,
+.board-card:focus-within .board-card-actions {
     opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+    .card-actions {
+        max-height: 2rem;
+        opacity: 1;
+        margin-top: 0;
+    }
+
+    .board-card-actions {
+        opacity: 1;
+    }
 }
 
 /* Responsive */
@@ -916,7 +946,7 @@ button.card-votes:active {
         padding: 2rem 1rem;
     }
 
-    .board-card-delete {
+    .board-card-actions {
         opacity: 1;
     }
 

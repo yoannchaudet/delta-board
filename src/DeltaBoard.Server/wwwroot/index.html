@@ -43,10 +43,10 @@
         </div>
         <div class="header-actions">
             <span id="participant-count" class="participant-count" style="display: none;"><span id="participant-number" class="participant-number"></span> online<span id="ready-count" class="ready-count"></span></span>
-            <span id="connection-status" class="status-indicator"></span>
+            <span id="connection-status" class="status-indicator" role="status" aria-live="polite"></span>
             <button id="reconnect-btn" class="btn-reconnect" style="display: none;">Reconnect</button>
             <button id="download-btn" class="btn-export" style="display: none;">&#x2B07;&#xFE0E; Export Markdown</button>
-            <button id="ready-btn" class="btn-ready" style="display: none;"><span class="btn-ready-check">&#x2714;</span> I'm ready</button>
+            <button id="ready-btn" class="btn-ready" aria-pressed="false" style="display: none;"><span class="btn-ready-check">&#x2714;</span> I'm ready</button>
             <button id="theme-toggle" class="btn-theme-toggle" aria-label="Theme: Auto" title="Theme: Auto">&#x25D1;</button>
         </div>
     </header>
@@ -89,7 +89,7 @@
 
         <section class="card-input">
             <div id="card-input-bar" class="card-input-bar">
-                <span id="card-input-bar-label">Add card</span>
+                <label id="card-input-bar-label" for="card-input-text">Add card</label>
                 <button id="card-input-cancel" class="card-input-cancel" style="display: none;">Cancel</button>
             </div>
             <textarea id="card-input-text" class="card-input-textarea" placeholder="Type your thought..." rows="2"></textarea>
@@ -120,6 +120,8 @@
             <div class="cards" id="delta-cards"></div>
         </section>
     </main>
+
+    <div id="app-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
     <footer>
         <p>&copy; 2026 <a href="https://mavensoul.studio" target="_blank" rel="noopener">Maven Soul Studio</a>. <a href="https://github.com/yoannchaudet/delta-board" target="_blank" rel="noopener">Code</a> licensed under the <a href="https://github.com/yoannchaudet/delta-board/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>. <span class="app-version">&middot; {{VERSION}}</span></p>

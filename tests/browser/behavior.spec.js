@@ -56,15 +56,7 @@ test('synchronizes cards, ownership, edits, votes, and deletion', async ({ brows
     await peerCard.getByTitle('Vote').click();
     await expect(ownerCard.locator('.card-votes')).toHaveText('1');
 
-    if (isMobile) {
-      test.info().annotations.push({
-        type: 'known issue',
-        description: 'Edit and delete controls currently require hover on touch-only viewports.'
-      });
-      return;
-    }
-
-    await ownerCard.hover();
+    if (!isMobile) await ownerCard.hover();
     await ownerCard.getByRole('button', { name: 'Edit' }).click();
     await owner.locator('#card-input-text').fill('Shared success, clarified');
     await owner.getByRole('button', { name: /Save to Delta/ }).click();
@@ -72,7 +64,7 @@ test('synchronizes cards, ownership, edits, votes, and deletion', async ({ brows
 
     owner.on('dialog', dialog => dialog.accept());
     const editedCard = cardWithText(owner, 'Shared success, clarified');
-    await editedCard.hover();
+    if (!isMobile) await editedCard.hover();
     await editedCard.getByRole('button', { name: 'Delete' }).click();
     await expect(cardWithText(peer, 'Shared success, clarified')).toHaveCount(0);
   } finally {

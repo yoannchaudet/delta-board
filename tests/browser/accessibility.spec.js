@@ -4,7 +4,13 @@ import { openBoard, populatedBoard, seedClient } from './helpers.js';
 
 async function violationIds(page) {
   const results = await new AxeBuilder({ page }).analyze();
-  return results.violations.map(violation => violation.id).sort();
+  return results.violations.map(violation => ({
+    id: violation.id,
+    nodes: violation.nodes.map(node => ({
+      target: node.target,
+      failureSummary: node.failureSummary
+    }))
+  })).sort((left, right) => left.id.localeCompare(right.id));
 }
 
 test('tracks the landing-page accessibility baseline in both themes', async ({ page }) => {
@@ -56,10 +62,10 @@ test('tracks review and 404 accessibility baselines', async ({ browser }, testIn
     try {
       await openBoard(page, boardId);
       await expect(page.locator('#phase-chip')).toBeVisible();
-      expect(await violationIds(page)).toEqual(['color-contrast']);
+      expect(await violationIds(page)).toEqual([]);
 
       await page.goto('/not-found-for-accessibility');
-      expect(await violationIds(page)).toEqual(['landmark-one-main', 'region']);
+      expect(await violationIds(page)).toEqual([]);
     } finally {
       await context.close();
     }
@@ -106,7 +112,7 @@ test('does not overflow the viewport', async ({ page }) => {
   expect(hasHorizontalOverflow).toBe(false);
 });
 
-test.fail('reduces application animation when the OS requests reduced motion', async ({ page }) => {
+test('reduces application animation when the OS requests reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
 
@@ -118,4 +124,134 @@ test.fail('reduces application animation when the OS requests reduced motion', a
   );
 
   expect(motionDurations).toEqual([]);
+});
+
+test('keeps board navigation separate from board actions', async ({ context, page }) => {
+  await seedClient(context, {
+    boardId: 'semantic-board',
+    board: { ...populatedBoard, phase: 'reviewing' }
+  });
+  await page.goto('/');
+
+  const boardCard = page.locator('.board-card');
+  await expect(boardCard.getByRole('link', { name: /semantic-board/ })).toHaveCount(1);
+  await expect(boardCard.getByRole('button', { name: /Clone board semantic-board/ }))
+    .toHaveCount(1);
+  await expect(boardCard.getByRole('button', { name: /Delete board semantic-board/ }))
+    .toHaveCount(1);
+  await expect(boardCard.getByRole('link').getByRole('button')).toHaveCount(0);
+});
+
+test('exposes connection, readiness, and vote state', async ({ browser }) => {
+  const boardId = `states-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const ownerContext = await browser.newContext();
+  const peerContext = await browser.newContext();
+  await seedClient(ownerContext, { clientId: 'states-owner' });
+  await seedClient(peerContext, { clientId: 'states-peer' });
+  const owner = await ownerContext.newPage();
+  const peer = await peerContext.newPage();
+
+  try {
+    await openBoard(owner, boardId);
+    await openBoard(peer, boardId);
+    await expect(owner.locator('#connection-status'))
+      .toContainText('Connection status: Connected and syncing changes');
+
+    const ready = owner.getByRole('button', { name: /I'm ready/ });
+    await expect(ready).toHaveAttribute('aria-pressed', 'false');
+    await ready.click();
+    await expect(ready).toHaveAttribute('aria-pressed', 'true');
+
+    await peer.locator('#card-input-text').fill('Accessible vote state');
+    await peer.getByRole('button', { name: /Add to Went Well/ }).click();
+    const vote = owner.getByRole('button', {
+      name: '0 votes. Vote for: Accessible vote state'
+    });
+    await expect(vote).toHaveAttribute('aria-pressed', 'false');
+    await vote.focus();
+    await owner.keyboard.press('Enter');
+    const removeVote = owner.getByRole('button', {
+      name: '1 vote. Remove vote from: Accessible vote state'
+    });
+    await expect(removeVote).toHaveAttribute('aria-pressed', 'true');
+    await expect(removeVote).toBeFocused();
+  } finally {
+    await ownerContext.close();
+    await peerContext.close();
+  }
+});
+
+test('restores focus after editing and deletion', async ({ context, page }) => {
+  const boardId = `focus-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  await seedClient(context, {
+    boardId,
+    clientId: 'client-owner',
+    board: populatedBoard
+  });
+  await openBoard(page, boardId);
+
+  const edit = page.getByRole('button', { name: 'Edit card: Clear collaboration' });
+  await edit.focus();
+  await page.keyboard.press('Enter');
+  const cancel = page.getByRole('button', { name: 'Cancel' });
+  await cancel.focus();
+  await page.keyboard.press('Enter');
+  await expect(edit).toBeFocused();
+
+  page.on('dialog', dialog => dialog.accept());
+  const card = page.locator('.card').filter({ hasText: 'Clear collaboration' });
+  const deleteButton = card.getByRole('button', {
+    name: 'Delete card: Clear collaboration'
+  });
+  await deleteButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'What Went Well' })).toBeFocused();
+});
+
+test('restores focus when review removes the active card controls', async ({ browser }) => {
+  const boardId = `review-focus-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+  const ownerContext = await browser.newContext();
+  const peerContext = await browser.newContext();
+  await seedClient(ownerContext, {
+    boardId,
+    clientId: 'client-owner',
+    board: populatedBoard
+  });
+  await seedClient(peerContext, {
+    boardId,
+    clientId: 'client-peer',
+    board: populatedBoard
+  });
+  const owner = await ownerContext.newPage();
+  const peer = await peerContext.newPage();
+
+  try {
+    await openBoard(owner, boardId);
+    await openBoard(peer, boardId);
+    await owner.getByRole('button', { name: /I'm ready/ }).click();
+
+    const edit = owner.getByRole('button', { name: 'Edit card: Clear collaboration' });
+    await edit.focus();
+    await peer.getByRole('button', { name: /I'm ready/ }).click();
+    const startReview = peer.getByRole('button', { name: 'Start Review' });
+    await expect(startReview).toBeVisible();
+    peer.once('dialog', dialog => dialog.accept());
+    await startReview.click();
+
+    await expect(owner.locator('#phase-chip')).toBeFocused();
+  } finally {
+    await ownerContext.close();
+    await peerContext.close();
+  }
+});
+
+test('shows owned-card actions on touch viewports', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'Touch visibility is covered by the mobile project.');
+  await openBoard(page, `touch-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
+  await page.locator('#card-input-text').fill('Touch actions');
+  await page.getByRole('button', { name: /Add to Went Well/ }).click();
+
+  const card = page.locator('.card').filter({ hasText: 'Touch actions' });
+  await expect(card.getByRole('button', { name: 'Edit card: Touch actions' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Delete card: Touch actions' })).toBeVisible();
 });
