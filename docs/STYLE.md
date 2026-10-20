@@ -92,6 +92,11 @@ font-family:
 | Small/meta      | 0.875rem | 400    |
 | Button          | 0.875rem | 500    |
 
+Typography, spacing, shape, elevation, focus, and semantic color values are defined as
+CSS custom properties in `src/DeltaBoard.Server/wwwroot/css/shared.css`. Component rules
+in `styles.css` consume those shared tokens rather than defining their own visual
+constants. Tokens preserve the values in this guide in both light and dark themes.
+
 ## Logo & Mascot
 
 ### Logo Mark (`mark.svg`)
@@ -120,8 +125,8 @@ The mascots have:
 
 ### Cards & Containers
 
-- Border radius: `8px`
-- Shadow: `0 2px 4px rgba(0, 0, 0, 0.1)`
+- Border radius: `var(--radius-md)` (`8px`)
+- Shadow: `var(--shadow-surface)` (`0 2px 4px rgba(0, 0, 0, 0.1)` in light mode)
 - White background on warm white page
 
 ### Buttons
