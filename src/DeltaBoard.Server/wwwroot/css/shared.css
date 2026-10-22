@@ -42,6 +42,7 @@
 
     --color-vote: #ff9800;
     --color-error: #f44336;
+    --color-focus-ring: var(--color-text);
     --color-on-accent: #ffffff;
     --color-brand-ink: #5b4237;
     --color-on-accent-muted: rgba(255, 255, 255, 0.25);
@@ -74,7 +75,8 @@
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --line-height-control: 1;
-    --line-height-heading: 1.2;
+    --line-height-heading: 1.25;
+    --line-height-supporting: 1.4;
     --line-height-body: 1.5;
     --letter-spacing-label: 0.02em;
     --letter-spacing-caps: 0.05em;
@@ -160,6 +162,9 @@
 
 body {
     font-family: var(--font-family-sans);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-regular);
+    line-height: var(--line-height-body);
     background-color: var(--color-bg);
     color: var(--color-text);
     min-height: 100vh;
@@ -170,6 +175,12 @@ body {
 
 main, footer {
     width: 100%;
+}
+
+h1,
+h2,
+h3 {
+    line-height: var(--line-height-heading);
 }
 
 .visually-hidden {
@@ -185,7 +196,7 @@ main, footer {
 }
 
 :focus-visible {
-    outline: var(--focus-outline-width) var(--focus-outline-style) var(--color-text);
+    outline: var(--focus-outline-width) var(--focus-outline-style) var(--color-focus-ring);
     outline-offset: var(--focus-outline-offset);
 }
 
@@ -206,6 +217,7 @@ footer {
     padding: var(--space-2xl) var(--space-3xl);
     text-align: center;
     font-size: var(--font-size-sm);
+    line-height: var(--line-height-supporting);
     color: var(--color-text-light);
 }
 
