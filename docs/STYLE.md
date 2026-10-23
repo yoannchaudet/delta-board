@@ -97,6 +97,17 @@ CSS custom properties in `src/DeltaBoard.Server/wwwroot/css/shared.css`. Compone
 in `styles.css` consume those shared tokens rather than defining their own visual
 constants. Tokens preserve the values in this guide in both light and dark themes.
 
+Use a `1.25` line height for headings, `1.4` for supporting text, and `1.5` for body
+copy. Keep compact labels and status chips visually secondary without reducing
+descriptive text below the small/meta size.
+
+## Focus
+
+Keyboard focus uses a `3px` solid outline with a `3px` offset. The
+`--color-focus-ring` token resolves to the high-contrast text color in each theme.
+Interactive controls must not suppress this focus indicator. Semantic borders and
+glows can supplement the outline, but they do not replace it.
+
 ## Logo & Mascot
 
 ### Logo Mark (`mark.svg`)

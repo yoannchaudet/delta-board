@@ -63,6 +63,7 @@ header {
     padding: var(--space-chip-block) var(--space-sm);
     border-radius: var(--radius-pill);
     letter-spacing: var(--letter-spacing-label);
+    line-height: var(--line-height-supporting);
 }
 
 .offline-chip {
@@ -79,8 +80,9 @@ header {
 
 .header-tagline {
     font-size: var(--font-size-xs);
+    line-height: var(--line-height-supporting);
     color: var(--color-text-light);
-    margin-top: var(--space-3xs);
+    margin-top: var(--space-2xs);
 }
 
 .app-version {
@@ -144,6 +146,7 @@ header {
 
 .participant-count {
     font-size: var(--font-size-compact);
+    line-height: var(--line-height-supporting);
     color: var(--color-text-light);
     white-space: nowrap;
 }
@@ -294,6 +297,7 @@ header {
 
 .quorum-banner-text p {
     font-size: var(--font-size-detail);
+    line-height: var(--line-height-supporting);
     color: var(--color-text-light);
 }
 
@@ -441,6 +445,11 @@ header {
     border-color: var(--color-text-light);
 }
 
+.card-input-textarea:focus-visible {
+    outline: var(--focus-outline-width) var(--focus-outline-style) var(--color-focus-ring);
+    outline-offset: var(--focus-outline-offset);
+}
+
 .card-input-textarea.aim-well {
     border-color: var(--color-well);
     box-shadow: var(--shadow-focus-well);
@@ -513,6 +522,7 @@ header {
 
 .shortcut-hint {
     font-size: var(--font-size-2xs);
+    line-height: var(--line-height-supporting);
     opacity: 0.7;
     font-weight: var(--font-weight-regular);
 }
@@ -561,9 +571,10 @@ header {
 }
 
 .column-subtitle {
-    font-size: var(--font-size-caption);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-supporting);
     color: var(--color-text-light);
-    margin-top: var(--space-3xs);
+    margin-top: var(--space-xs);
 }
 
 .cards {
@@ -626,6 +637,11 @@ header {
     margin: calc(-1 * var(--space-sm));
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-border);
+}
+
+.card-content[contenteditable="true"]:focus-visible {
+    outline: var(--focus-outline-width) var(--focus-outline-style) var(--color-focus-ring);
+    outline-offset: var(--focus-outline-offset);
 }
 
 .card-votes {
@@ -881,6 +897,7 @@ button.card-votes:active {
 
 .board-card-meta {
     font-size: var(--font-size-sm);
+    line-height: var(--line-height-supporting);
     color: var(--color-text-light);
     display: flex;
     gap: var(--space-sm);
