@@ -14,7 +14,7 @@ RUN dotnet publish src/DeltaBoard.Server/DeltaBoard.Server.csproj \
     /p:Version=$VERSION
 
 # Stage 2: Runtime
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine
+FROM mcr.microsoft.com/dotnet/runtime-deps:11.0-alpine
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 RUN apk add --no-cache icu-data-full icu-libs gcompat tzdata
 WORKDIR /app
