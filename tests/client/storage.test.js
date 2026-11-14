@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     getAllBoards,
     deleteBoard,
@@ -14,17 +14,18 @@ describe('storage', () => {
 
     beforeEach(() => {
         mockStorage = {};
-        global.localStorage = {
+        vi.stubGlobal('localStorage', {
             getItem: (key) => mockStorage[key] ?? null,
             setItem: (key, value) => { mockStorage[key] = value; },
             removeItem: (key) => { delete mockStorage[key]; },
             key: (index) => Object.keys(mockStorage)[index],
             get length() { return Object.keys(mockStorage).length; },
             clear: () => { mockStorage = {}; }
-        };
+        });
     });
 
     afterEach(() => {
+        vi.unstubAllGlobals();
         mockStorage = {};
     });
 
